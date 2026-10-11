@@ -1,0 +1,122 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
+// Cash on delivery: PENDING → CONFIRMED (customer called) → SHIPPED → DELIVERED (cash received).
+// CANCELLED puts the items back in stock. Declaration order = order shown in the admin.
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         Role     @default(CUSTOMER)
+  createdAt    DateTime @default(now())
+  orders       Order[]
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  products Product[]
+  // Two levels: a main category (parentId null) groups sub-categories. Max depth enforced in the actions.
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  name        String
+  slug        String           @unique
+  description String           @default("")
+  categoryId  String
+  category    Category         @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime         @default(now())
+  variants    ProductVariant[]
+  images      Image[]
+}
+
+model ProductVariant {
+  id         String      @id @default(cuid())
+  productId  String
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku        String      @unique
+  color      String
+  size       String
+  price      Int // dinars (DZD), no cents
+  stockCount Int         @default(0)
+  images     Image[]
+  orderItems OrderItem[]
+
+  @@unique([productId, color, size])
+}
+
+model Image {
+  id        String          @id @default(cuid())
+  url       String
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  userId      String? // null = guest order (customers have no accounts)
+  user        User?       @relation(fields: [userId], references: [id])
+  status      OrderStatus @default(PENDING)
+  totalAmount Int // items + shippingFee: what the courier collects
+  shippingFee Int         @default(0) // flat fee from Réglages at checkout time
+  // delivery (cash on delivery); defaults only so pre-existing rows migrate
+  fullName    String      @default("")
+  phone       String      @default("")
+  wilaya      String      @default("")
+  address     String      @default("")
+  createdAt   DateTime    @default(now())
+  items       OrderItem[]
+}
+
+// Réglages (admin): a single row, id 1, inserted by its migration. Empty text = the default from lib/dict.
+model Settings {
+  id             Int    @id // always 1
+  storeName      String @default("")
+  taglineFr      String @default("")
+  taglineAr      String @default("")
+  heroTitleFr    String @default("")
+  heroTitleAr    String @default("")
+  heroImage      String @default("") // /uploads/… URL, "" = plain ink block
+  shippingTextFr String @default("")
+  shippingTextAr String @default("")
+  whatsapp       String @default("") // digits, international format; "" hides the button
+  deliveryFee    Int    @default(0) // DZD, flat, every wilaya; 0 = free
+  lowStock       Int    @default(3) // "Stock faible" at or below this
+}
+
+model OrderItem {
+  id              String         @id @default(cuid())
+  orderId         String
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId       String
+  variant         ProductVariant @relation(fields: [variantId], references: [id])
+  quantity        Int
+  priceAtPurchase Int
+}

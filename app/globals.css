@@ -1,26 +1,102 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Nike design system tokens (design systems for claude/nike/DESIGN.md). Light only: the system has no dark mode. */
+@theme inline {
+  --color-ink: #111111;
+  --color-canvas: #ffffff;
+  --color-cloud: #f5f5f5;
+  --color-charcoal: #39393b;
+  --color-mute: #707072;
+  --color-stone: #9e9ea0;
+  --color-hairline: #cacacb;
+  --color-hairline-soft: #e5e5e5;
+  --color-sale: #d30005;
+  --color-success: #007d48;
+  --color-info: #1151ff;
+
+  --font-sans: var(--font-inter), var(--font-arabic), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-display: var(--font-bebas), var(--font-arabic-display), "Helvetica Neue", Arial, sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: ui-monospace, monospace;
+
+  /* shadcn semantic aliases → Nike tokens */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --radius-sm: 18px;
+  --radius-md: 24px;
+  --radius-lg: 30px;
+}
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #111111;
+  --card: #ffffff;
+  --card-foreground: #111111;
+  --popover: #ffffff;
+  --popover-foreground: #111111;
+  --primary: #111111;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #111111;
+  --muted: #f5f5f5;
+  --muted-foreground: #707072;
+  --accent: #f5f5f5;
+  --accent-foreground: #111111;
+  --destructive: #d30005;
+  --border: #cacacb;
+  --input: #cacacb;
+  --ring: #111111;
+  --radius: 30px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ink;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Campaign display tier: 96px / 0.9 / uppercase; 64px tablet, 48px mobile. Arabic has no case, so drop uppercase. */
+@utility display-campaign {
+  font-family: var(--font-display);
+  font-size: clamp(48px, 9vw, 96px);
+  line-height: 0.9;
+  text-transform: uppercase;
+  letter-spacing: -0.005em;
+  &:where([dir="rtl"] *) {
+    line-height: 1.15;
+    font-weight: 700;
+  }
+}
+
+/* success toasts fade away on their own; error toasts stay */
+@keyframes toast-out {
+  to { opacity: 0; visibility: hidden; }
+}
+.toast-auto {
+  animation: toast-out 0.3s ease 4s forwards;
 }

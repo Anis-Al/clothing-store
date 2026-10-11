@@ -1,0 +1,190 @@
+// Client-safe dictionaries. Server code imports from lib/i18n, which lays the admin's Réglages over
+// store name, tagline, hero title and delivery text; client components see these defaults only.
+
+const fr = {
+  store: { name: "ATELIER", tagline: "Vêtements pensés pour durer." },
+  nav: { shop: "Boutique", search: "Rechercher", cart: "Panier", logout: "Se déconnecter", admin: "Administration", help: "Aide" },
+  home: {
+    heroTitle: "Nouvelle saison", heroCta: "Découvrir", latest: "Nouveautés", categories: "Par catégorie",
+    shopNow: "Voir",
+  },
+  catalog: {
+    title: "Tous les produits", results: "résultats", all: "Tout", category: "Catégorie", size: "Taille",
+    color: "Couleur", empty: "Aucun produit ne correspond à votre recherche.", clear: "Effacer les filtres",
+    searchFor: "Résultats pour", colors: "couleurs", soldOut: "Épuisé",
+    sortBy: "Trier", sortNew: "Nouveautés", sortPriceAsc: "Prix croissant", sortPriceDesc: "Prix décroissant",
+    filters: "Filtres",
+  },
+  product: {
+    selectColor: "Couleur", selectSize: "Choisir une taille", addToCart: "Ajouter au panier",
+    soldOut: "Épuisé", inStock: "En stock", lowStock: "Plus que {n} en stock", added: "Ajouté au panier",
+    details: "Détails du produit", shipping: "Livraison et retours",
+    shippingText: "Livraison dans toutes les wilayas sous 2 à 5 jours. Retours gratuits sous 14 jours.",
+    chooseSize: "Sélectionnez une taille", viewCart: "Voir le panier", order: "Commander",
+    ask: "Une question ? WhatsApp", askMsg: "Bonjour, je suis intéressé(e) par : {item}",
+  },
+  cart: {
+    title: "Panier", empty: "Votre panier est vide.", continue: "Continuer mes achats", subtotal: "Sous-total",
+    shipping: "Livraison", free: "Gratuite", total: "Total", checkout: "Commander", remove: "Retirer",
+    qty: "Quantité", mockNote: "Paiement à la livraison : rien n'est débité en ligne.",
+    delivery: "Livraison", fullName: "Nom et prénom", phone: "Téléphone", phoneHint: "Mobile : 05, 06 ou 07…",
+    wilaya: "Wilaya", chooseWilaya: "Choisir une wilaya", address: "Adresse (commune, rue, n°)",
+    badPhone: "Numéro de mobile invalide (ex. 0555 12 34 56).", missing: "Nom, téléphone, wilaya et adresse sont obligatoires.",
+    sending: "Envoi…",
+  },
+  notFound: { title: "Page introuvable", text: "Ce produit n'existe plus ou le lien est incorrect." },
+  confirm: {
+    title: "Commande confirmée", thanks: "Merci ! Votre commande est enregistrée.",
+    call: "Nous vous appelons pour confirmer la livraison. Paiement à la réception.", ref: "Numéro de commande", summary: "Récapitulatif",
+  },
+  auth: {
+    loginTitle: "Connexion administrateur", username: "Identifiant", password: "Mot de passe", submitLogin: "Se connecter",
+    invalid: "Identifiant ou mot de passe incorrect.",
+  },
+  status: { PENDING: "En attente", CONFIRMED: "Confirmée", SHIPPED: "Expédiée", DELIVERED: "Livrée", CANCELLED: "Annulée" },
+  errors: { stock: "Stock insuffisant pour « {item} ».", generic: "Une erreur est survenue." },
+  admin: {
+    dashboard: "Tableau de bord", products: "Produits", inventory: "Stock", orders: "Commandes",
+    backToStore: "Voir la boutique", newProduct: "Nouveau produit", edit: "Modifier", delete: "Supprimer",
+    save: "Enregistrer", name: "Nom",
+    description: "Description", category: "Catégorie", variants: "Variantes", price: "Prix (DA)",
+    stock: "Stock", sku: "Référence", color: "Couleur", size: "Taille", images: "Images",
+    colorsList: "Couleurs (séparées par des virgules)", sizesList: "Tailles (séparées par des virgules)",
+    matrixHint: "Une variante est créée pour chaque couleur × taille.", addVariants: "Ajouter les variantes",
+    upload: "Téléverser", imageFor: "Pour la couleur", allColors: "Toutes les couleurs",
+    sortStockAsc: "Stock ↑", sortStockDesc: "Stock ↓", product: "Produit", customer: "Client",
+    items: "Articles", date: "Date", total: "Total", status: "Statut", lowStock: "Stock faible",
+    pending: "Commandes en attente", noImages: "Aucune image.", confirmDelete: "Supprimer définitivement ?",
+    hasOrders: "Impossible : des commandes y font référence. Mettez le stock à 0.", saved: "Enregistré.",
+    delivery: "Livraison", all: "Toutes", searchOrders: "Nom, téléphone ou n°", search: "Rechercher", actions: "Actions", none: "Aucun élément.", duplicate: "Cette variante (couleur × taille) existe déjà.",
+    badImage: "Image refusée : JPG, PNG, WebP, AVIF ou GIF, 8 Mo maximum.", required: "Nom, catégorie, couleurs et tailles sont obligatoires.",
+    revenue: "Encaissé (commandes livrées)", noStock: "Stock insuffisant pour réactiver cette commande.",
+    outOfStock: "Rupture", allCategories: "Toutes les catégories", searchProducts: "Nom du produit",
+    searchStock: "Produit ou référence", pagination: "Pagination", prev: "Précédent", next: "Suivant",
+    pageOf: "Page {page} / {pages}",
+    categories: "Catégories", newCategory: "Nouvelle catégorie", add: "Ajouter", link: "Lien boutique",
+    categoriesHint: "La barre de navigation montre les catégories principales ; leurs sous-catégories s'ouvrent au survol. Une catégorie sans produit n'apparaît pas dans la boutique. Renommer ne change pas son lien.",
+    hiddenInStore: "masquée dans la boutique", catDuplicate: "Une catégorie porte déjà ce nom.",
+    catHasProducts: "Impossible : des produits sont dans cette catégorie. Changez-les de catégorie d'abord.",
+    noCategory: "Créez d'abord une catégorie.",
+    parentCategory: "Catégorie parente", topLevel: "— Catégorie principale", chooseCategory: "Choisir une catégorie",
+    catDepth: "Deux niveaux maximum : la parente doit être une catégorie principale, et une catégorie qui a des sous-catégories reste principale.",
+    catHasChildren: "Impossible : elle contient des sous-catégories. Déplacez-les ou supprimez-les d'abord.",
+    settings: "Réglages", settingsHint: "Un champ de texte laissé vide reprend le texte par défaut, affiché en gris.",
+    sStore: "Boutique", storeName: "Nom de la boutique", tagline: "Slogan",
+    whatsapp: "Numéro WhatsApp",
+    whatsappHint: "Format international, ex. 213555123456. Vide : pas de bouton WhatsApp sur les fiches produit.",
+    badWhatsapp: "Numéro WhatsApp invalide : 8 à 15 chiffres avec l'indicatif du pays (ex. 213555123456).",
+    sHome: "Page d'accueil", heroTitle: "Titre de la bannière", heroImage: "Image de la bannière",
+    heroImageHint: "Format paysage, 1600 px de large ou plus. Sans image, la bannière reste noire.",
+    removeImage: "Retirer l'image",
+    deliveryFee: "Frais de livraison (DA)",
+    deliveryFeeHint: "Même montant pour toutes les wilayas, ajouté au total de la commande. 0 = gratuite.",
+    shippingText: "Texte « Livraison et retours » (fiches produit, pied de page)",
+    lowStockLimit: "Seuil « Stock faible »",
+    lowStockHint: "Une variante à ce stock ou moins compte en stock faible (tableau de bord, Stock, « Plus que n en stock » sur la fiche).",
+    activity: "Activité", ranges: ["7 jours", "30 jours", "90 jours"], ordersPerDay: "Commandes par jour",
+    amountPerDay: "Montant commandé par jour (hors annulées)", byStatus: "Commandes par statut",
+    topProducts: "Meilleures ventes (articles, hors annulées)", noData: "Aucune commande sur la période.",
+  },
+}
+
+export type Dict = typeof fr
+
+const ar: Dict = {
+  store: { name: "ATELIER", tagline: "ملابس مصممة لتدوم." },
+  nav: { shop: "المتجر", search: "بحث", cart: "السلة", logout: "تسجيل الخروج", admin: "الإدارة", help: "مساعدة" },
+  home: {
+    heroTitle: "موسم جديد", heroCta: "اكتشف", latest: "وصل حديثاً", categories: "حسب الفئة", shopNow: "تسوّق",
+  },
+  catalog: {
+    title: "كل المنتجات", results: "نتيجة", all: "الكل", category: "الفئة", size: "المقاس", color: "اللون",
+    empty: "لا توجد منتجات مطابقة لبحثك.", clear: "مسح الفلاتر", searchFor: "نتائج البحث عن",
+    colors: "ألوان", soldOut: "نفد",
+    sortBy: "ترتيب", sortNew: "الأحدث", sortPriceAsc: "السعر تصاعدياً", sortPriceDesc: "السعر تنازلياً",
+    filters: "تصفية",
+  },
+  product: {
+    selectColor: "اللون", selectSize: "اختر المقاس", addToCart: "أضف إلى السلة", soldOut: "نفد المخزون",
+    inStock: "متوفر", lowStock: "بقي {n} فقط", added: "تمت الإضافة إلى السلة", details: "تفاصيل المنتج",
+    shipping: "التوصيل والإرجاع", shippingText: "توصيل إلى جميع الولايات خلال 2 إلى 5 أيام. إرجاع مجاني خلال 14 يوماً.",
+    chooseSize: "يرجى اختيار المقاس", viewCart: "عرض السلة", order: "اطلب الآن",
+    ask: "سؤال؟ واتساب", askMsg: "مرحباً، أنا مهتم بـ: {item}",
+  },
+  cart: {
+    title: "السلة", empty: "سلتك فارغة.", continue: "مواصلة التسوق", subtotal: "المجموع الفرعي",
+    shipping: "التوصيل", free: "مجاني", total: "المجموع", checkout: "إتمام الطلب", remove: "حذف",
+    qty: "الكمية", mockNote: "الدفع عند الاستلام: لا يتم خصم أي مبلغ عبر الإنترنت.",
+    delivery: "التوصيل", fullName: "الاسم واللقب", phone: "الهاتف", phoneHint: "الهاتف المحمول: 05 أو 06 أو 07…",
+    wilaya: "الولاية", chooseWilaya: "اختر الولاية", address: "العنوان (البلدية، الشارع، الرقم)",
+    badPhone: "رقم الهاتف غير صالح (مثال: 0555123456).", missing: "الاسم والهاتف والولاية والعنوان مطلوبة.",
+    sending: "جارٍ الإرسال…",
+  },
+  notFound: { title: "الصفحة غير موجودة", text: "هذا المنتج لم يعد متوفراً أو الرابط غير صحيح." },
+  confirm: {
+    title: "تم تأكيد الطلب", thanks: "شكراً! تم تسجيل طلبك.",
+    call: "سنتصل بك لتأكيد التوصيل. الدفع عند الاستلام.", ref: "رقم الطلب", summary: "ملخص الطلب",
+  },
+  auth: {
+    loginTitle: "دخول المسؤول", username: "اسم المستخدم", password: "كلمة المرور", submitLogin: "دخول",
+    invalid: "اسم المستخدم أو كلمة المرور غير صحيحة.",
+  },
+  status: { PENDING: "قيد الانتظار", CONFIRMED: "مؤكد", SHIPPED: "تم الشحن", DELIVERED: "تم التسليم", CANCELLED: "ملغى" },
+  errors: { stock: "المخزون غير كافٍ لـ «{item}».", generic: "حدث خطأ ما." },
+  admin: {
+    dashboard: "لوحة التحكم", products: "المنتجات", inventory: "المخزون", orders: "الطلبات",
+    backToStore: "عرض المتجر", newProduct: "منتج جديد", edit: "تعديل", delete: "حذف", save: "حفظ",
+    name: "الاسم", description: "الوصف",
+    category: "الفئة", variants: "المتغيرات", price: "السعر (دج)", stock: "المخزون", sku: "المرجع", color: "اللون",
+    size: "المقاس", images: "الصور", colorsList: "الألوان (مفصولة بفواصل)", sizesList: "المقاسات (مفصولة بفواصل)",
+    matrixHint: "يُنشأ متغيّر لكل لون × مقاس.", addVariants: "إضافة المتغيرات", upload: "رفع", imageFor: "للون",
+    allColors: "كل الألوان", sortStockAsc: "المخزون ↑", sortStockDesc: "المخزون ↓", product: "المنتج",
+    customer: "الزبون", items: "المواد", date: "التاريخ", total: "المجموع", status: "الحالة",
+    lowStock: "مخزون منخفض", pending: "طلبات قيد الانتظار", noImages: "لا توجد صور.",
+    confirmDelete: "حذف نهائي؟", hasOrders: "غير ممكن: توجد طلبات مرتبطة. اجعل المخزون 0.", saved: "تم الحفظ.",
+    delivery: "التوصيل", all: "الكل", searchOrders: "الاسم أو الهاتف أو الرقم", search: "بحث", actions: "إجراءات", none: "لا توجد عناصر.", duplicate: "هذا المتغيّر (لون × مقاس) موجود بالفعل.",
+    badImage: "صورة مرفوضة: JPG أو PNG أو WebP أو AVIF أو GIF، 8 ميغابايت كحد أقصى.", required: "الاسم والفئة والألوان والمقاسات مطلوبة.",
+    revenue: "المحصَّل (الطلبات المسلَّمة)", noStock: "المخزون غير كافٍ لإعادة تفعيل هذا الطلب.",
+    outOfStock: "نفد المخزون", allCategories: "كل الفئات", searchProducts: "اسم المنتج",
+    searchStock: "المنتج أو المرجع", pagination: "ترقيم الصفحات", prev: "السابق", next: "التالي",
+    pageOf: "صفحة {page} / {pages}",
+    categories: "الفئات", newCategory: "فئة جديدة", add: "إضافة", link: "رابط المتجر",
+    categoriesHint: "شريط التنقل يعرض الفئات الرئيسية، وتظهر فئاتها الفرعية عند تمرير المؤشر. الفئة التي لا تحتوي على منتجات لا تظهر في المتجر. تغيير الاسم لا يغيّر رابطها.",
+    hiddenInStore: "مخفية في المتجر", catDuplicate: "توجد فئة بهذا الاسم بالفعل.",
+    catHasProducts: "غير ممكن: توجد منتجات في هذه الفئة. انقلها إلى فئة أخرى أولاً.",
+    noCategory: "أنشئ فئة أولاً.",
+    parentCategory: "الفئة الأم", topLevel: "— فئة رئيسية", chooseCategory: "اختر فئة",
+    catDepth: "مستويان كحد أقصى: يجب أن تكون الفئة الأم فئة رئيسية، والفئة التي لها فئات فرعية تبقى رئيسية.",
+    catHasChildren: "غير ممكن: تحتوي على فئات فرعية. انقلها أو احذفها أولاً.",
+    settings: "الإعدادات", settingsHint: "حقل النص الفارغ يستعمل النص الافتراضي المعروض باللون الرمادي.",
+    sStore: "المتجر", storeName: "اسم المتجر", tagline: "الشعار",
+    whatsapp: "رقم واتساب",
+    whatsappHint: "بالصيغة الدولية، مثال: 213555123456. فارغ: لا يظهر زر واتساب في صفحات المنتجات.",
+    badWhatsapp: "رقم واتساب غير صالح: من 8 إلى 15 رقماً مع رمز الدولة (مثال: 213555123456).",
+    sHome: "الصفحة الرئيسية", heroTitle: "عنوان اللافتة", heroImage: "صورة اللافتة",
+    heroImageHint: "صورة أفقية بعرض 1600 بكسل أو أكثر. بدون صورة تبقى اللافتة سوداء.",
+    removeImage: "إزالة الصورة",
+    deliveryFee: "رسوم التوصيل (دج)",
+    deliveryFeeHint: "نفس المبلغ لكل الولايات، يُضاف إلى مجموع الطلب. 0 = مجاني.",
+    shippingText: "نص «التوصيل والإرجاع» (صفحات المنتجات، أسفل الصفحة)",
+    lowStockLimit: "حد «مخزون منخفض»",
+    lowStockHint: "المتغيّر الذي مخزونه عند هذا الحد أو أقل يُعدّ مخزوناً منخفضاً (لوحة التحكم، المخزون، «بقي n فقط» في صفحة المنتج).",
+    activity: "النشاط", ranges: ["7 أيام", "30 يوماً", "90 يوماً"], ordersPerDay: "الطلبات يومياً",
+    amountPerDay: "قيمة الطلبات يومياً (دون الملغاة)", byStatus: "الطلبات حسب الحالة",
+    topProducts: "الأكثر مبيعاً (قطع، دون الملغاة)", noData: "لا توجد طلبات في هذه الفترة.",
+  },
+}
+
+export const DICTS = { fr, ar }
+export type Locale = keyof typeof DICTS
+
+export const fill = (s: string, vars: Record<string, string | number>) =>
+  s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""))
+
+export const formatPrice = (n: number, locale: Locale) =>
+  new Intl.NumberFormat(locale === "ar" ? "ar-DZ" : "fr-DZ", {
+    style: "currency", currency: "DZD", maximumFractionDigits: 0,
+  }).format(n)
+
+export const formatDate = (d: Date, locale: Locale) =>
+  new Intl.DateTimeFormat(locale === "ar" ? "ar-DZ" : "fr-FR", { dateStyle: "medium" }).format(d)

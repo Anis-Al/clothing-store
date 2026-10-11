@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.env*
+prisma/*.db*
+public/uploads
+Dockerfile
+.dockerignore
+prisma/backups
