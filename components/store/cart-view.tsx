@@ -22,10 +22,10 @@ function savedShipping(): Partial<Shipping> {
   }
 }
 
-// fee: flat delivery fee from Réglages (display only; checkout re-reads it from the DB)
+// fee: flat delivery fee from Réglages (checkout refuses the order if it changed since)
 export function CartView({ fee }: { fee: number }) {
   const { t, locale } = useT()
-  const { items, setQty, remove, clear } = useCart()
+  const { items, setQty, remove, reprice, clear } = useCart()
   const router = useRouter()
   const [pending, start] = useTransition()
   const [error, setError] = useState<string>()
@@ -39,8 +39,12 @@ export function CartView({ fee }: { fee: number }) {
     const f = Object.fromEntries(new FormData(e.currentTarget)) as Shipping
     setError(undefined)
     start(async () => {
-      const res = await checkout(items.map((i) => ({ variantId: i.variantId, qty: i.qty })), f)
-      if ("error" in res) return setError(res.error)
+      const res = await checkout(items.map(({ variantId, qty, price }) => ({ variantId, qty, price })), fee, f)
+      if ("error" in res) {
+        // prices or fee changed: show the new total (refresh re-reads the fee) before the customer retries
+        if (res.prices) { reprice(res.prices); router.refresh() }
+        return setError(res.error)
+      }
       const ref = res.orderId.slice(-8).toUpperCase()
       try {
         localStorage.setItem("atelier:shipping", JSON.stringify(f))

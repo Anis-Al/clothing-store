@@ -100,6 +100,9 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   `3` again: use `lowStock`.
 - **Delivery fee**: flat, from Réglages, re-read by `checkout` (never from the client).
   `Order.totalAmount` = items + `Order.shippingFee` (the fee at checkout time); revenue includes it.
+- **Checkout price check**: the cart sends the prices and fee it displayed; if any differs from the DB,
+  `checkout` refuses (`t.errors.priceChanged`) and returns the current prices, the cart reprices
+  (`reprice`) and refreshes (new fee). The customer never orders at a total they didn't see.
 - **Colors** are free text; `swatch()` in `lib/utils.ts` maps French names to hex, else uses the
   text as a CSS color.
 - **Charts** (admin dashboard): shadcn `ChartContainer` + Recharts in `components/admin/charts.tsx`
@@ -544,6 +547,30 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - Gotcha again: the running dev server kept serving `ImportForm` as undefined (new export of an existing
   client module) until the file was touched again; no code change needed.
 
+### 2026-10-14 — Review fixes
+- Request: "check if there is anything to improve", then "implement" the list. Work on branch `review-fixes`
+  (the CSV import was committed first, as it was).
+- **Stale cart price**: the cart kept the price from add-to-cart time while checkout charged the DB price, so
+  the courier collected an amount the customer never saw (CSV import makes bulk price changes easy). Now
+  `checkout(lines + price, fee, shipping)` compares inside the transaction, before any stock moves, and
+  refuses on any difference (see Conventions). Also closes the old "fee changed while the cart is open" gap.
+- **Product with no variant left** (last one deleted): the card showed "∞ DA" (`Math.min()` of nothing).
+  `getProducts` always requires a variant, `HAS_PRODUCTS` too (no menu entry for such a category), the PDP
+  is a 404.
+- **Admin login lockout** (`auth.ts`): 10 wrong passwords, each within 15 min of the last, lock that username
+  for 15 min ("Trop de tentatives…", `CredentialsSignin` subclass with `code = "locked"`, read by the login
+  action). In memory, only existing admins tracked, cleared by a restart (DEPLOY.md 3.6).
+- **CSV import**: a `"` opens a quoted cell only at its start (`32"` used to swallow the rest of the file);
+  price must be ≥ 1 (form price inputs now `min={1}` too); `Main › Sub` must name the real parent
+  (`Bas › Chemises` refused, keys `main/sub` in `catBy`). Rules text updated FR/AR.
+- DEPLOY.md: stale "no cancelled status yet" removed.
+- Verified (dev, user's own server): variant-less temp product absent from `/products`, PDP noindex 404;
+  price 4500 → 4700 in DB → order refused, cart shows 4 700; fee 0 → 300 → refused, cart shows 300 / 5 000
+  after refresh; third try → order 5 000 (fee 300, line 4 700) on `/merci` and in DB. Order deleted, price,
+  stock and fee restored. Temp admin: 10 wrong → 11th with the right password "Trop de tentatives"; another
+  temp admin logs in after one wrong try. Both deleted. typecheck, lint, 8 tests clean.
+  DB backed up first (`prisma/backups/store-2026-10-14-08-52.db`).
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - `docker build` never run yet (Docker Desktop not initialized on the dev machine). The first build may need fixes.
@@ -556,8 +583,7 @@ Keep this section last; update it when something here gets done or newly found.
   On touch tablets (≥768px) the hover menu doesn't open: tapping a main category opens its page, whose
   sub-row lists the sub-categories.
 - Delivery fee is one flat amount (Réglages): no per-wilaya fee or stop-desk option; commune is free
-  text in the address. Admin orders show the total only, not the fee part. If the admin changes the fee
-  while a customer has the cart open, the order is charged the new fee (cart showed the old one).
+  text in the address. Admin orders show the total only, not the fee part.
 - `createProduct`/`updateProduct` don't refuse a main category that has sub-categories (only the form
   hides it).
 - Store name is one value for both languages (FR/AR for tagline, hero title, delivery text only).
@@ -566,6 +592,8 @@ Keep this section last; update it when something here gets done or newly found.
   and re-import; it can't rename products, change their category/description or delete variants.
 - Product content is single-language (no `nameAr`); add columns if the catalog must be bilingual.
 - Admin password can only be changed with `npm run admin:set` (no UI; not picked for Réglages).
+  Login lockout is per username, in memory: someone can keep the admin locked out on purpose (then add a
+  per-IP limit in Caddy). A checkout for a variant deleted meanwhile still says "Stock insuffisant pour « ? »".
 - Réglages: switching tabs drops unsaved edits without a warning (each tab is its own form).
   Categories: folds opened by hand close after every save (only the `?open=` group reopens); the old
   `/admin/categories` URL is a 404.

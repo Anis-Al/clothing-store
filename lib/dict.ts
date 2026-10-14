@@ -39,10 +39,13 @@ const fr = {
   },
   auth: {
     loginTitle: "Connexion administrateur", username: "Identifiant", password: "Mot de passe", submitLogin: "Se connecter",
-    invalid: "Identifiant ou mot de passe incorrect.",
+    invalid: "Identifiant ou mot de passe incorrect.", locked: "Trop de tentatives. Réessayez dans 15 minutes.",
   },
   status: { PENDING: "En attente", CONFIRMED: "Confirmée", SHIPPED: "Expédiée", DELIVERED: "Livrée", CANCELLED: "Annulée" },
-  errors: { stock: "Stock insuffisant pour « {item} ».", generic: "Une erreur est survenue." },
+  errors: {
+    stock: "Stock insuffisant pour « {item} ».", generic: "Une erreur est survenue.",
+    priceChanged: "Les prix ou les frais de livraison ont changé. Vérifiez le nouveau total puis commandez à nouveau.",
+  },
   admin: {
     dashboard: "Tableau de bord", products: "Produits", inventory: "Stock", orders: "Commandes",
     backToStore: "Voir la boutique", newProduct: "Nouveau produit", edit: "Modifier", delete: "Supprimer",
@@ -89,8 +92,8 @@ const fr = {
     import: "Importer", importTitle: "Importer des produits (CSV)",
     importRules: [
       "Une ligne par variante (couleur × taille). Les lignes au même nom forment un produit : sa catégorie et sa description viennent de sa première ligne.",
-      "Catégorie : le nom d'une catégorie existante, la sous-catégorie quand il y en a.",
-      "Prix en DA sans centimes, stock en nombre entier.",
+      "Catégorie : le nom d'une catégorie existante, la sous-catégorie quand il y en a (« Chemises » ou « Hauts › Chemises »).",
+      "Prix en DA sans centimes (au moins 1), stock en nombre entier.",
       "Produit déjà présent (même nom) : les nouvelles variantes sont ajoutées, le prix et le stock des autres remplacés ; son nom, sa catégorie et sa description ne changent pas.",
       "Depuis Excel : Fichier › Enregistrer sous › « CSV UTF-8 ». Les images s'ajoutent ensuite sur la fiche du produit.",
       "À la moindre erreur, rien n'est importé : corrigez les lignes signalées et renvoyez le fichier.",
@@ -144,10 +147,13 @@ const ar: Dict = {
   },
   auth: {
     loginTitle: "دخول المسؤول", username: "اسم المستخدم", password: "كلمة المرور", submitLogin: "دخول",
-    invalid: "اسم المستخدم أو كلمة المرور غير صحيحة.",
+    invalid: "اسم المستخدم أو كلمة المرور غير صحيحة.", locked: "محاولات كثيرة. أعد المحاولة بعد 15 دقيقة.",
   },
   status: { PENDING: "قيد الانتظار", CONFIRMED: "مؤكد", SHIPPED: "تم الشحن", DELIVERED: "تم التسليم", CANCELLED: "ملغى" },
-  errors: { stock: "المخزون غير كافٍ لـ «{item}».", generic: "حدث خطأ ما." },
+  errors: {
+    stock: "المخزون غير كافٍ لـ «{item}».", generic: "حدث خطأ ما.",
+    priceChanged: "تغيّرت الأسعار أو رسوم التوصيل. راجع المجموع الجديد ثم أعد تأكيد الطلب.",
+  },
   admin: {
     dashboard: "لوحة التحكم", products: "المنتجات", inventory: "المخزون", orders: "الطلبات",
     backToStore: "عرض المتجر", newProduct: "منتج جديد", edit: "تعديل", delete: "حذف", save: "حفظ",
@@ -192,8 +198,8 @@ const ar: Dict = {
     import: "استيراد", importTitle: "استيراد المنتجات (CSV)",
     importRules: [
       "سطر لكل متغيّر (لون × مقاس). الأسطر التي تحمل نفس الاسم تشكّل منتجاً واحداً: فئته ووصفه من أول سطر له.",
-      "الفئة: اسم فئة موجودة، والفئة الفرعية إن وُجدت.",
-      "السعر بالدينار دون كسور، والمخزون عدد صحيح.",
+      "الفئة: اسم فئة موجودة، والفئة الفرعية إن وُجدت («Chemises» أو «Hauts › Chemises»).",
+      "السعر بالدينار دون كسور (1 على الأقل)، والمخزون عدد صحيح.",
       "منتج موجود (نفس الاسم): تُضاف المتغيرات الجديدة ويُستبدل سعر ومخزون الموجودة؛ اسمه وفئته ووصفه لا تتغير.",
       "من Excel: ملف › حفظ باسم › «CSV UTF-8». تُضاف الصور بعد ذلك من صفحة المنتج.",
       "عند أي خطأ لا يُستورد شيء: صحّح الأسطر المذكورة وأعد إرسال الملف.",

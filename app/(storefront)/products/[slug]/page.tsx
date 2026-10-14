@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: PageProps<"/products/[slug]">
 
 export default async function ProductPage({ params }: PageProps<"/products/[slug]">) {
   const [p, { t }, s] = await Promise.all([getProduct(decodeURIComponent((await params).slug)), getI18n(), getSettings()])
-  if (!p) notFound()
+  if (!p?.variants.length) notFound() // a product with no variant left has nothing to sell
 
   const row = (label: string, body: string, open = false) => (
     <details className="group border-b border-hairline py-6" open={open}>

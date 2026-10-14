@@ -20,6 +20,7 @@ type Cart = {
   add: (item: Omit<CartItem, "qty">) => void
   setQty: (variantId: string, qty: number) => void
   remove: (variantId: string) => void
+  reprice: (prices: Record<string, number>) => void // current DB prices, from a refused checkout
   clear: () => void
 }
 
@@ -40,6 +41,8 @@ export const useCart = create<Cart>()(
         set((s) => ({
           items: s.items.map((i) => (i.variantId === variantId ? { ...i, qty: Math.max(1, Math.min(qty, i.stock)) } : i)),
         })),
+      reprice: (prices) =>
+        set((s) => ({ items: s.items.map((i) => (i.variantId in prices ? { ...i, price: prices[i.variantId] } : i)) })),
       remove: (variantId) => set((s) => ({ items: s.items.filter((i) => i.variantId !== variantId) })),
       clear: () => set({ items: [] }),
     }),

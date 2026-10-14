@@ -117,7 +117,7 @@ export default async function EditProduct({ params, searchParams }: PageProps<"/
                       </TableCell>
                       <TableCell className="font-medium">{v.size}</TableCell>
                       <TableCell className="font-mono text-xs text-mute" dir="ltr">{v.sku}</TableCell>
-                      <TableCell><Input name={`price_${v.id}`} type="number" min={0} defaultValue={v.price} className="h-9 w-28" dir="ltr" /></TableCell>
+                      <TableCell><Input name={`price_${v.id}`} type="number" min={1} defaultValue={v.price} className="h-9 w-28" dir="ltr" /></TableCell>
                       <TableCell>
                         <Input name={`stock_${v.id}`} type="number" min={0} defaultValue={v.stockCount} dir="ltr"
                           className={cn("h-9 w-20", v.stockCount === 0 ? "text-sale" : v.stockCount <= lowStock && "text-[#b45309]")} />

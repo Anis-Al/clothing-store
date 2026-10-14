@@ -13,6 +13,8 @@ export function decodeText(buf: Uint8Array) {
 
 // RFC 4180: quoted cells may hold the separator, "" and line breaks. Separator = the most frequent of ; , tab
 // on the first line (French and Arabic Excel write ";"). Blank rows are kept so index + 1 = the Excel row number.
+// A quote opens a quoted cell only at the start of the cell: a stray one (size 32") stays text instead of
+// swallowing the rest of the file.
 export function parseCsv(text: string): string[][] {
   text = text.replace(/^﻿/, "")
   const first = text.split(/\r?\n/, 1)[0]
@@ -25,7 +27,7 @@ export function parseCsv(text: string): string[][] {
       if (c === '"' && text[i + 1] === '"') { cell += '"'; i++ }
       else if (c === '"') quoted = false
       else cell += c
-    } else if (c === '"') quoted = true
+    } else if (c === '"' && !cell) quoted = true
     else if (c === sep) { row.push(cell); cell = "" }
     else if (c === "\n" || c === "\r") {
       if (c === "\r" && text[i + 1] === "\n") i++
@@ -75,8 +77,16 @@ export function planImport(table: string[][], t: Dict, cats: Cat[], products: Pr
   const missing = REQUIRED.filter((k) => !idx.has(k))
   if (missing.length) return { errors: [fill(t.admin.importColumns, { cols: missing.map((k) => t.admin[k]).join(", ") })], plan: [] }
 
+  // Keys: name or slug, and "main/sub" so "Hauts › Chemises" must name the real parent ("Bas › Chemises" is refused).
   const catBy = new Map<string, Cat>()
-  for (const c of cats) for (const k of [c.slug, slugify(c.name)]) if (!catBy.has(k)) catBy.set(k, c)
+  const keys = (c: Cat) => [c.slug, slugify(c.name)]
+  for (const c of cats) {
+    const parent = cats.find((p) => p.id === c.parentId)
+    for (const k of keys(c)) {
+      if (!catBy.has(k)) catBy.set(k, c)
+      if (parent) for (const pk of keys(parent)) catBy.set(`${pk}/${k}`, c)
+    }
+  }
   const prodBy = new Map<string, Prod | null>() // null = several products have this name
   for (const p of products) prodBy.set(norm(p.name), prodBy.has(norm(p.name)) ? null : p)
 
@@ -87,10 +97,11 @@ export function planImport(table: string[][], t: Dict, cats: Cat[], products: Pr
     const get = (k: Col) => (cells[idx.get(k) ?? -1] ?? "").trim()
     const [name, category, color, size] = [get("name"), get("category"), get("color"), get("size")]
     const [price, stockCount] = [toInt(get("price")), toInt(get("stock"))]
-    const bad = REQUIRED.find((k) => (k === "price" ? isNaN(price) : k === "stock" ? isNaN(stockCount) : !get(k)))
+    // price 0 would put the product on sale for free
+    const bad = REQUIRED.find((k) => (k === "price" ? !(price > 0) : k === "stock" ? isNaN(stockCount) : !get(k)))
     if (bad) return err(fill(t.admin.importValue, { col: t.admin[bad] }))
 
-    const cat = catBy.get(slugify(category.split(/[›>]/).pop() ?? "")) // "Hauts › Chemises" works too
+    const cat = catBy.get(category.split(/[›>]/).map(slugify).slice(-2).join("/"))
     if (!cat) return err(fill(t.admin.importCategory, { v: category }))
     if (cats.some((c) => c.parentId === cat.id)) return err(fill(t.admin.importGroup, { v: category }))
     const key = norm(name)

@@ -4,17 +4,29 @@ import { fill, getI18n, getSettings } from "@/lib/i18n"
 import { isWilaya, normalizePhone } from "@/lib/wilayas"
 
 class StockError extends Error {}
+class PriceError extends Error {
+  prices: Record<string, number>
+  constructor(prices: Record<string, number>) {
+    super()
+    this.prices = prices
+  }
+}
 
-// Guest checkout, cash on delivery. Prices come from the DB, never from the client.
+// Guest checkout, cash on delivery. Prices come from the DB, never from the client: the prices and fee the
+// cart showed (`price`, `fee`) are only compared, so the customer never orders at a total they didn't see.
 export type Shipping = { fullName: string; phone: string; wilaya: string; address: string }
 
-export async function checkout(lines: { variantId: string; qty: number }[], shipping: Shipping) {
+export async function checkout(lines: { variantId: string; qty: number; price: number }[], fee: number, shipping: Shipping) {
   const { t } = await getI18n()
 
   const qty = new Map<string, number>()
+  const shown = new Map<string, number>()
   for (const l of Array.isArray(lines) ? lines.slice(0, 100) : []) {
     const n = Math.floor(Number(l?.qty))
-    if (typeof l?.variantId === "string" && n > 0 && n <= 99) qty.set(l.variantId, (qty.get(l.variantId) ?? 0) + n)
+    if (typeof l?.variantId === "string" && n > 0 && n <= 99) {
+      qty.set(l.variantId, (qty.get(l.variantId) ?? 0) + n)
+      shown.set(l.variantId, Number(l.price))
+    }
   }
   if (!qty.size) return { error: t.cart.empty }
 
@@ -29,6 +41,9 @@ export async function checkout(lines: { variantId: string; qty: number }[], ship
   try {
     const order = await db.$transaction(async (tx) => {
       const variants = await tx.productVariant.findMany({ where: { id: { in: [...qty.keys()] } }, include: { product: true } })
+      // The cart keeps the price from when the item was added; the admin may have changed it (or the fee) since.
+      if (Number(fee) !== deliveryFee || variants.some((v) => v.price !== shown.get(v.id)))
+        throw new PriceError(Object.fromEntries(variants.map((v) => [v.id, v.price])))
       let total = 0
       for (const [id, n] of qty) {
         const v = variants.find((x) => x.id === id)
@@ -53,6 +68,7 @@ export async function checkout(lines: { variantId: string; qty: number }[], ship
     return { orderId: order.id }
   } catch (e) {
     if (e instanceof StockError) return { error: fill(t.errors.stock, { item: e.message }) }
+    if (e instanceof PriceError) return { error: t.errors.priceChanged, prices: e.prices }
     throw e
   }
 }

@@ -252,6 +252,9 @@ docker exec atelier npx tsx scripts/admin.mts admin 'a-long-new-password'
 The same command creates another admin if you give it a new username
 (`... scripts/admin.mts karim 'his-password'`). The admin login page is `/admin`; it isn't linked anywhere in the shop.
 
+After 10 wrong passwords for a username, that username is locked for 15 minutes ("Trop de tentatives").
+The lock lives in memory: `docker restart atelier` clears it.
+
 ### 3.7 Optional: docker compose instead of `docker run`
 
 `/srv/atelier/compose.yaml`:
@@ -413,7 +416,7 @@ Apart from the admin screens (Réglages, Catégories, products), every customiza
 - [ ] Nightly backups, copied off the server.
 - [ ] `/srv/atelier.env` readable only by you (`chmod 600`).
 - [ ] Keep an eye on fake orders. Anyone can place a cash-on-delivery order, and it reserves stock.
-      There is no rate limit and no "cancelled" status yet.
+      There is no rate limit on orders: cancel fake ones ("Annulée") and their stock comes back.
 
 ---
 

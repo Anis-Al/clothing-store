@@ -54,6 +54,7 @@ test("CSV import: parse, decode, plan", async () => {
   const rows = [["Nom", "Desc"], ["a;b", 'il dit "oui"\nligne 2'], ["", ""]]
   assert.deepEqual(parseCsv("﻿" + toCsv(rows)), rows)
   assert.deepEqual(parseCsv("a,b\r\n1,2"), [["a", "b"], ["1", "2"]])
+  assert.deepEqual(parseCsv('a;b\nJean;32"\nPolo;L'), [["a", "b"], ["Jean", '32"'], ["Polo", "L"]]) // stray quote stays text
   assert.equal(decodeText(new Uint8Array([0x63, 0x61, 0x66, 0xe9])), "café") // windows-1252 from plain Excel CSV
   assert.equal(decodeText(new TextEncoder().encode("﻿قميص")), "قميص")
 
@@ -74,13 +75,15 @@ test("CSV import: parse, decode, plan", async () => {
     [undefined, "Ceinture", [[undefined, "Unique", 900, 0]]],
   ])
   assert.deepEqual(plan("Nom;Couleur\nx;y").errors, ["Colonnes manquantes : Catégorie, Taille, Prix (DA), Stock."])
-  const bad = plan("Nom;Catégorie;Couleur;Taille;Prix;Stock\nA;Hauts;Noir;M;1;1\nB;Chemises;Noir;M;1.000;1\nC;Robes;Noir;M;1;1\nPolo;Chemises;Noir;M;1;1\nD;Chemises;Noir;M;1;1\nD;Chemises;noir;m;1;1")
+  const bad = plan("Nom;Catégorie;Couleur;Taille;Prix;Stock\nA;Hauts;Noir;M;1;1\nB;Chemises;Noir;M;1.000;1\nC;Robes;Noir;M;1;1\nPolo;Chemises;Noir;M;1;1\nD;Chemises;Noir;M;1;1\nD;Chemises;noir;m;1;1\nE;Chemises;Noir;M;0;1\nF;Accessoires › Chemises;Noir;M;1;1")
   assert.deepEqual(bad.errors, [
     "Ligne 2 : « Hauts » a des sous-catégories : indiquez la sous-catégorie",
     "Ligne 3 : « Prix (DA) » manquant ou invalide",
     "Ligne 4 : catégorie « Robes » introuvable",
     "Ligne 5 : plusieurs produits s'appellent « Polo »",
     "Ligne 7 : variante noir / m en double",
+    "Ligne 8 : « Prix (DA) » manquant ou invalide",
+    "Ligne 9 : catégorie « Accessoires › Chemises » introuvable",
   ])
   assert.deepEqual(plan("Nom;Catégorie;Couleur;Taille;Prix;Stock\n;;;;;").errors, ["Le fichier ne contient aucune ligne de produit."])
 })

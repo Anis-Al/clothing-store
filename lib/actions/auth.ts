@@ -1,5 +1,5 @@
 "use server"
-import { AuthError } from "next-auth"
+import { AuthError, CredentialsSignin } from "next-auth"
 import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { signIn, signOut } from "@/auth"
@@ -20,7 +20,10 @@ export async function login(_: string | undefined, form: FormData) {
       redirectTo: safePath(form.get("callbackUrl")),
     })
   } catch (e) {
-    if (e instanceof AuthError) return (await getI18n()).t.auth.invalid
+    if (e instanceof AuthError) {
+      const { t } = await getI18n()
+      return e instanceof CredentialsSignin && e.code === "locked" ? t.auth.locked : t.auth.invalid // locked: see auth.ts
+    }
     throw e // NEXT_REDIRECT on success
   }
 }

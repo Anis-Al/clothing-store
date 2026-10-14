@@ -41,7 +41,7 @@ export function MatrixFields({ t }: { t: Dict }) {
     <div className="grid gap-4 md:grid-cols-2">
       <Field label={t.admin.colorsList}><Input name="colors" placeholder="Noir, Blanc, Bleu" /></Field>
       <Field label={t.admin.sizesList}><Input name="sizes" placeholder="S, M, L, XL" dir="ltr" /></Field>
-      <Field label={t.admin.price}><Input name="price" type="number" min={0} required dir="ltr" /></Field>
+      <Field label={t.admin.price}><Input name="price" type="number" min={1} required dir="ltr" /></Field>
       <Field label={t.admin.stock}><Input name="stock" type="number" min={0} defaultValue={0} dir="ltr" /></Field>
       <p className="text-sm text-mute md:col-span-2">{t.admin.matrixHint}</p>
     </div>

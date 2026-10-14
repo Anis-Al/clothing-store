@@ -9,7 +9,7 @@ export async function getProducts(f: Filters = {}, take?: number) {
   const where: Prisma.ProductWhereInput = {
     ...(f.q && { name: { contains: f.q } }),
     ...(f.category && { category: inCategory(f.category) }),
-    ...(Object.keys(variant).length && { variants: { some: variant } }),
+    variants: { some: variant }, // also hides a product whose last variant was deleted (no price to show)
   }
   const rows = await db.product.findMany({
     where,
@@ -41,7 +41,7 @@ const inCategory = (slug: string) => ({ OR: [{ slug }, { parent: { slug } }] }) 
 
 // Storefront menus list only categories that have products (directly or through a sub-category):
 // an empty one would be a dead end.
-const HAS_PRODUCTS = { products: { some: {} } } satisfies Prisma.CategoryWhereInput
+const HAS_PRODUCTS = { products: { some: { variants: { some: {} } } } } satisfies Prisma.CategoryWhereInput
 export const SHOWN_CATEGORY = { OR: [HAS_PRODUCTS, { children: { some: HAS_PRODUCTS } }] } satisfies Prisma.CategoryWhereInput
 
 // Main categories with their non-empty sub-categories, for the navbar and the catalog filters.
