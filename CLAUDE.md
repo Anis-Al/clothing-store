@@ -117,6 +117,9 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   below `md` the header is hidden and each row wraps its cells (no sideways scroll). Per cell:
   `max-md:basis-full` = own line, `max-md:ms-auto` = pushed to the end, `data-label={…}` = small caption
   above the value (replaces the hidden header for inputs). Read-only lists (Produits) stay plain tables.
+- **Admin filters on phones** = one row on every list (Produits, Stock, Commandes): search + `FiltersPill`
+  ("Filtres (n)", `components/admin/fields.tsx`), an empty-bodied `<details class="peer">` whose next sibling
+  (chips, category) unfolds below with `max-md:hidden max-md:basis-full peer-open:flex`. Desktop: no pill, one row.
 
 ## Design system mapping (Nike → this app)
 
@@ -622,8 +625,53 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   Statuses and stock restored to the starting values. typecheck, lint, 7 tests clean.
   DB backed up first (`prisma/backups/store-2026-10-14-11-49.db`).
 
+### 2026-10-14 — Admin filters on phones
+- Complaint: on phones the filter chips filled the first screen (375px: Commandes 184px of chips on 4 rows,
+  1 order visible; Stock/Produits 136px on 3 ragged rows, 2 variants visible).
+- `ListFilters`: search (full width) + "Filtres" pill on one row; the pill is ink with `(n)` when stock or
+  category is set and unfolds the stock chips + category select (full width). Not the storefront's
+  render-twice fold: the search must share the pill's row, so the panel is a sibling of an empty-bodied
+  `<details class="peer">` and shows with `peer-open:flex`. Category select now has its own GET form
+  (carries `q`); the search form carries `category`. Desktop: same single row as before.
+- Commandes: status chips in one swipeable row bleeding to the screen edges (`-mx-4 px-4`), search on its own
+  full-width line. `ChipRow` (client, `components/admin/client.tsx`) centers the `aria-current` chip with a
+  `scrollLeft` delta, which also works in RTL.
+- Verified (dev, 375px): Stock 136 → 40px (3 variants on the first screen), Commandes 184 → 88px; chip tap keeps
+  the fold open; search keeps `stock`, category keeps `stock` + `q`, pill "(2)"; `?status=CANCELLED` → Annulée
+  scrolled into view in FR and AR; no horizontal page scroll. 1280px: one 40px row, no pill, same order.
+  A search (plain GET form = full reload) closes the fold; the pill count still shows. typecheck, lint clean.
+- Then the user found the Commandes swipe row too busy ("something simpler"): Commandes now uses the same
+  search + pill as Produits/Stock (statuses with counts in the fold), pill markup shared as `FiltersPill`,
+  `ChipRow` deleted. Verified at 375px (AR): closed 40px, `?status=PENDING` → "(1)"; 1280px one row, no pill.
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
+- **TODO (planned) — Working with Yalidine (delivery company).** Not decided how deep; options below.
+  **Step 0, needed by every option:** split the checkout address into wilaya (exists), **commune** (select)
+  and street address. The user will provide the Algerian localization data (wilayas / communes); don't
+  invent the list. Yalidine needs exact wilaya / commune names, so this comes first.
+  Levels, lightest first (they stack):
+  1. **Tracking number only**: admin pastes the Yalidine tracking (`yal-…`) on the order after creating the
+     parcel in Yalidine's dashboard → shown in admin orders, can go in the WhatsApp message to the customer.
+     One `Order` field, no API.
+  2. **Export for Yalidine's bulk import** (recommended start, with 1): tick confirmed orders → "Exporter pour
+     Yalidine" → file in Yalidine's import format (name, phone, wilaya, commune, address, product list,
+     amount to collect) → admin uploads it in the Yalidine dashboard, which flags bad communes; tracking
+     pasted back with level 1. No keys, quotas or API errors; reuse `lib/csv.ts`. **Blocked on the user
+     sending Yalidine's import template** (from their dashboard): copy its columns exactly, don't guess.
+  3. **One-way API**: "Envoyer à Yalidine" on a confirmed order → `POST /parcels`, tracking + label URL kept
+     on `Order` (schema change). No status sync. Needs API keys and exact commune names.
+  4. **Full integration**: 3 plus `/deliveryfees` (per-wilaya fee instead of the flat one), `/centers`
+     (stop-desk option), `/histories` (sync statuses, e.g. "Livré" → `DELIVERED`). Only if volume grows.
+  API notes (2026-10-14, from unofficial clients; the official docs need a merchant login — verify there):
+  base `https://api.yalidine.app/v1/`, headers `X-API-ID` + `X-API-TOKEN` (server-side env vars only),
+  `POST /parcels` takes a JSON **array** and answers per `order_id` `{ success, tracking, label, message }`;
+  parcel fields: order_id, from_wilaya_name, firstname, familyname, contact_phone, address,
+  to_wilaya_name, to_commune_name, product_list, price (0–150000), do_insurance, declared_value,
+  length/width/height/weight, freeshipping, is_stopdesk (+ stopdesk_id), has_exchange (+ product_to_collect).
+  Quotas ≈ 5/s, 50/min, 1000/h, 10000/day (response headers `*-quota-left`). Statuses are French text.
+  References: github.com/tarek-berkane/yalidine (Python), github.com/feeefapp/yalidine (TS, `npm i yalidine`);
+  plain `fetch` is enough, no dependency needed.
 - `docker build` never run yet (Docker Desktop not initialized on the dev machine). The first build may need fixes.
 - Dashboard day buckets follow the server's time zone; the Docker image runs in UTC, so set
   `TZ=Africa/Algiers` there (untested) or orders placed between midnight and 1 am land on the day
@@ -634,7 +682,7 @@ Keep this section last; update it when something here gets done or newly found.
   On touch tablets (≥768px) the hover menu doesn't open: tapping a main category opens its page, whose
   sub-row lists the sub-categories.
 - Delivery fee is one flat amount (Réglages): no per-wilaya fee or stop-desk option; commune is free
-  text in the address. Admin orders show the total only, not the fee part.
+  text in the address (see the Yalidine TODO above). Admin orders show the total only, not the fee part.
 - `createProduct`/`updateProduct` don't refuse a main category that has sub-categories (only the form
   hides it).
 - Store name is one value for both languages (FR/AR for tagline, hero title, delivery text only).

@@ -3,7 +3,7 @@ import { OrderStatus, type Prisma } from "@prisma/client"
 import { Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Notice, Pager } from "@/components/admin/fields"
+import { FiltersPill, Notice, Pager } from "@/components/admin/fields"
 import { FormSelect } from "@/components/form-select"
 import { WhatsAppIcon } from "@/components/whatsapp-icon"
 import { updateOrderStatus } from "@/lib/actions/admin"
@@ -53,20 +53,23 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
       <h1 className="text-[32px] font-medium">{t.admin.orders}</h1>
       <Notice t={t} sp={searchParams} />
       <div className="flex flex-wrap items-center gap-2">
-        {[undefined, ...STATUSES].map((s) => (
-          <Link key={s ?? "all"} href={tab(s)} aria-current={status === s || undefined}
-            className={cn("inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium",
-              status === s ? "border-ink bg-ink text-canvas" : "border-hairline hover:border-ink")}>
-            {s ? t.status[s] : t.admin.all}
-            <span className="tabular-nums opacity-60">{count(s)}</span>
-          </Link>
-        ))}
-        <form action="/admin/orders" role="search" className="relative ms-auto">
+        <form action="/admin/orders" role="search" className="relative max-md:flex-1 md:order-last">
           {status && <input type="hidden" name="status" value={status} />}
           <Search className="pointer-events-none absolute start-3 top-1/2 size-5 -translate-y-1/2" />
           <input name="q" type="search" defaultValue={q} placeholder={t.admin.searchOrders} aria-label={t.admin.search}
-            className="h-10 w-64 rounded-[24px] bg-cloud ps-10 pe-4 outline-none focus:bg-canvas focus:ring-2 focus:ring-ink" />
+            className="h-10 w-full rounded-[24px] bg-cloud ps-10 pe-4 outline-none focus:bg-canvas focus:ring-2 focus:ring-ink md:w-64" />
         </form>
+        <FiltersPill t={t} active={status ? 1 : 0} />
+        <div className="flex flex-1 flex-wrap items-center gap-2 max-md:hidden max-md:basis-full peer-open:flex">
+          {[undefined, ...STATUSES].map((s) => (
+            <Link key={s ?? "all"} href={tab(s)} aria-current={status === s || undefined}
+              className={cn("inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium",
+                status === s ? "border-ink bg-ink text-canvas" : "border-hairline hover:border-ink")}>
+              {s ? t.status[s] : t.admin.all}
+              <span className="tabular-nums opacity-60">{count(s)}</span>
+            </Link>
+          ))}
+        </div>
       </div>
       <Table stack>
         <TableHeader>

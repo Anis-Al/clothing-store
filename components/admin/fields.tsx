@@ -1,6 +1,6 @@
 import Link from "next/link"
 import type { Category, Product } from "@prisma/client"
-import { ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { ChevronLeft, ChevronRight, Search, SlidersHorizontal } from "lucide-react"
 import { FormSelect } from "@/components/form-select"
 import { buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -85,31 +85,50 @@ export function SettingsNav({ t, active }: { t: Dict; active: SettingsTab }) {
   )
 }
 
-// ---- Admin lists (products, stock): filters + pagination, all in the URL (helpers in lib/utils) ----
+// ---- Admin lists (products, stock, orders): filters + pagination, all in the URL (helpers in lib/utils) ----
+
+// Phones: search + this pill on one row; the filters panel, its next sibling, unfolds below with
+// `max-md:hidden max-md:basis-full peer-open:flex`. Desktop: no pill, the panel is always shown.
+export function FiltersPill({ t, active }: { t: Dict; active: number }) {
+  return (
+    <details className="peer md:hidden">
+      <summary className={cn(chip(active > 0), "cursor-pointer list-none gap-2 [&::-webkit-details-marker]:hidden")}>
+        <SlidersHorizontal className="size-4" /> {t.catalog.filters}
+        {active > 0 && <span className="tabular-nums">({active})</span>}
+      </summary>
+    </details>
+  )
+}
 
 export function ListFilters({ t, path, cur, categories, placeholder }: {
   t: Dict; path: string; cur: ListParams; categories: Category[]; placeholder: string
 }) {
+  // GET forms carry the other filters; no page input, so a new search or category starts at page 1
+  const keep = (...keys: ("q" | "category" | "stock" | "sort")[]) =>
+    keys.map((k) => cur[k] && <input key={k} type="hidden" name={k} value={cur[k]} />)
+  const active = Number(!!cur.stock) + Number(!!cur.category)
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {([["", t.catalog.all], ["low", t.admin.lowStock], ["out", t.admin.outOfStock]] as const).map(([v, label]) => (
-        <Link key={v} href={listHref(path, cur, { stock: v, page: 1 })} aria-current={cur.stock === v || undefined} className={chip(cur.stock === v)}>
-          {label}
-        </Link>
-      ))}
-      {/* GET form: no page input, so a new search or category starts at page 1 */}
-      <form action={path} role="search" className="flex flex-wrap items-center gap-2 md:ms-auto">
-        {cur.stock && <input type="hidden" name="stock" value={cur.stock} />}
-        {cur.sort && <input type="hidden" name="sort" value={cur.sort} />}
-        <FormSelect name="category" size="sm" autoSubmit defaultValue={cur.category} placeholder={t.admin.allCategories}
-          aria-label={t.admin.category} className="w-52"
-          items={[{ value: "", label: t.admin.allCategories }, ...categoryOptions(categories)]} />
-        <div className="relative">
-          <Search className="pointer-events-none absolute start-3 top-1/2 size-5 -translate-y-1/2" />
-          <input name="q" type="search" defaultValue={cur.q} placeholder={placeholder} aria-label={t.admin.search}
-            className="h-10 w-64 rounded-[24px] bg-cloud ps-10 pe-4 outline-none focus:bg-canvas focus:ring-2 focus:ring-ink" />
-        </div>
+      <form action={path} role="search" className="relative max-md:flex-1 md:order-last">
+        {keep("stock", "sort", "category")}
+        <Search className="pointer-events-none absolute start-3 top-1/2 size-5 -translate-y-1/2" />
+        <input name="q" type="search" defaultValue={cur.q} placeholder={placeholder} aria-label={t.admin.search}
+          className="h-10 w-full rounded-[24px] bg-cloud ps-10 pe-4 outline-none focus:bg-canvas focus:ring-2 focus:ring-ink md:w-64" />
       </form>
+      <FiltersPill t={t} active={active} />
+      <div className="flex flex-1 flex-wrap items-center gap-2 max-md:hidden max-md:basis-full peer-open:flex">
+        {([["", t.catalog.all], ["low", t.admin.lowStock], ["out", t.admin.outOfStock]] as const).map(([v, label]) => (
+          <Link key={v} href={listHref(path, cur, { stock: v, page: 1 })} aria-current={cur.stock === v || undefined} className={chip(cur.stock === v)}>
+            {label}
+          </Link>
+        ))}
+        <form action={path} className="max-md:w-full md:ms-auto">
+          {keep("stock", "sort", "q")}
+          <FormSelect name="category" size="sm" autoSubmit defaultValue={cur.category} placeholder={t.admin.allCategories}
+            aria-label={t.admin.category} className="w-52 max-md:w-full"
+            items={[{ value: "", label: t.admin.allCategories }, ...categoryOptions(categories)]} />
+        </form>
+      </div>
     </div>
   )
 }
