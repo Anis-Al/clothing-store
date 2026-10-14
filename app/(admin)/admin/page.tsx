@@ -3,7 +3,7 @@ import { OrderStatus } from "@prisma/client"
 import { DashboardCharts, type Day } from "@/components/admin/charts"
 import { db } from "@/lib/db"
 import { formatPrice, getI18n, getSettings } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+import { cn, UNSOLD_STATUSES } from "@/lib/utils"
 
 const RANGES = [7, 30, 90] // labels in t.admin.ranges, same order (Arabic plural differs per number)
 
@@ -27,7 +27,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
     db.order.findMany({ where: since, select: { createdAt: true, status: true, totalAmount: true } }),
     // ponytail: rows summed in JS; fine for a shop's volume, a raw SQL GROUP BY if it ever gets slow
     db.orderItem.findMany({
-      where: { order: { ...since, status: { not: "CANCELLED" } } },
+      where: { order: { ...since, status: { notIn: UNSOLD_STATUSES } } },
       select: { quantity: true, variant: { select: { product: { select: { id: true, name: true } } } } },
     }),
   ])
@@ -44,7 +44,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
     const d = byDay.get(key(o.createdAt))
     if (!d) continue
     d.orders++
-    if (o.status !== "CANCELLED") d.amount += o.totalAmount
+    if (!UNSOLD_STATUSES.includes(o.status)) d.amount += o.totalAmount
   }
   const statuses = Object.values(OrderStatus).map((s) => ({ name: t.status[s], value: orders.filter((o) => o.status === s).length }))
   const qty = new Map<string, { name: string; value: number }>()

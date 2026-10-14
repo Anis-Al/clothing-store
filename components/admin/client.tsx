@@ -6,6 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { importProducts } from "@/lib/actions/admin"
 
+// Order note: Enter submits natively (single field, no button); leaving the field with a change submits too,
+// so a note typed and then clicked away from isn't lost.
+export function NoteInput(props: React.ComponentProps<"input">) {
+  return <input {...props} onBlur={(e) => { if (e.target.value !== e.target.defaultValue) e.target.form?.requestSubmit() }} />
+}
+
 export function ConfirmButton({ message, ...props }: React.ComponentProps<"button"> & { message: string }) {
   return <button {...props} onClick={(e) => { if (!confirm(message)) e.preventDefault() }} />
 }

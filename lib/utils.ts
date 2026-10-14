@@ -79,5 +79,7 @@ export function paginate(total: number, page: number, perPage: number) {
   return { pages, page: current, skip: (current - 1) * perPage, take: perPage }
 }
 
-// Delivered and cancelled orders never change status again (so a cancel gives the stock back once).
-export const FINAL_STATUSES: OrderStatus[] = ["DELIVERED", "CANCELLED"]
+// Delivered, returned and cancelled orders never change status again (so the stock comes back once).
+export const FINAL_STATUSES: OrderStatus[] = ["DELIVERED", "RETURNED", "CANCELLED"]
+// Not sales: the items went back to stock (charts and best sellers leave them out).
+export const UNSOLD_STATUSES: OrderStatus[] = ["RETURNED", "CANCELLED"]

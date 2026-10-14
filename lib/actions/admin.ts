@@ -9,7 +9,7 @@ import { db } from "@/lib/db"
 import { decodeText, parseCsv, planImport, type ImportState } from "@/lib/csv"
 import { fill, getI18n, getSettings } from "@/lib/i18n"
 import { MIME, UPLOAD_DIR } from "@/lib/uploads"
-import { FINAL_STATUSES, makeSku, slugify, unique } from "@/lib/utils"
+import { FINAL_STATUSES, makeSku, slugify, unique, UNSOLD_STATUSES } from "@/lib/utils"
 
 // Every action re-checks the role: proxy.ts guards pages, not direct action calls.
 
@@ -278,12 +278,22 @@ export async function updateOrderStatus(orderId: string, back: string, f: FormDa
   if (!Object.values(OrderStatus).includes(to)) return
   await db.$transaction(async (tx) => {
     // Only an open order changes: a final one (stale tab, double submit) is left as is,
-    // so a cancel gives the stock back exactly once.
-    const { count } = await tx.order.updateMany({ where: { id: orderId, status: { notIn: FINAL_STATUSES } }, data: { status: to } })
-    if (!count || to !== "CANCELLED") return
+    // so a cancel or return gives the stock back exactly once. Only a shipped parcel can come back.
+    const from = to === "RETURNED" ? "SHIPPED" : { notIn: FINAL_STATUSES }
+    const { count } = await tx.order.updateMany({ where: { id: orderId, status: from }, data: { status: to } })
+    if (!count || !UNSOLD_STATUSES.includes(to)) return
     for (const i of await tx.orderItem.findMany({ where: { orderId } }))
       await tx.productVariant.update({ where: { id: i.variantId }, data: { stockCount: { increment: i.quantity } } })
   })
   done()
   redirect(back)
+}
+
+// Any status, final ones too (e.g. why a parcel came back). Same `back` rule as the status.
+export async function updateOrderNote(orderId: string, back: string, f: FormData) {
+  await requireAdmin()
+  if (!back.startsWith("/admin/orders")) back = "/admin/orders"
+  await db.order.update({ where: { id: orderId }, data: { note: str(f, "note").slice(0, 500) } })
+  done()
+  redirect(`${back}${back.includes("?") ? "&" : "?"}saved=1`)
 }

@@ -56,11 +56,13 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   language the admin types. Only UI chrome is translated.
 - **Money**: integer dinars (DZD), formatted with `formatPrice()`.
 - **Order statuses** follow cash on delivery: `PENDING → CONFIRMED → SHIPPED → DELIVERED`, or
-  `CANCELLED`. The enum's declaration order is the admin's display order (`Object.values(OrderStatus)`).
-  `DELIVERED` and `CANCELLED` are **final** (`FINAL_STATUSES` in `lib/utils.ts`): `updateOrderStatus`
-  only writes to an open order, the orders page shows a badge instead of the select, and picking a final
-  status asks first (`FormSelect confirm`). Stock is taken at checkout and given back once on cancel —
-  only through `updateOrderStatus`. Revenue counts `DELIVERED` only.
+  `SHIPPED → RETURNED` (parcel refused / not collected, set once it is back in the shop), or `CANCELLED`.
+  The enum's declaration order is the admin's display order (`Object.values(OrderStatus)`).
+  `DELIVERED`, `RETURNED` and `CANCELLED` are **final** (`FINAL_STATUSES` in `lib/utils.ts`): `updateOrderStatus`
+  only writes to an open order (`RETURNED` only to a `SHIPPED` one; the select offers it only there), the
+  orders page shows a badge instead of the select, and picking a final status asks first (`FormSelect confirm`).
+  Stock is taken at checkout and given back once on cancel or return (`UNSOLD_STATUSES`) — only through
+  `updateOrderStatus`. Revenue counts `DELIVERED` only; charts and best sellers leave `UNSOLD_STATUSES` out.
 - **Writes** are Server Actions (`lib/actions/*`). Every admin action calls `requireAdmin()` itself;
   `proxy.ts` is only the first gate.
 - **Admin feedback**: actions redirect with `?saved=1` or `?error=<key>` (a key of `t.admin`); `Notice`
@@ -119,7 +121,9 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   above the value (replaces the hidden header for inputs). Read-only lists (Produits) stay plain tables.
 - **Admin filters on phones** = one row on every list (Produits, Stock, Commandes): search + `FiltersPill`
   ("Filtres (n)", `components/admin/fields.tsx`), an empty-bodied `<details class="peer">` whose next sibling
-  (chips, category) unfolds below with `max-md:hidden max-md:basis-full peer-open:flex`. Desktop: no pill, one row.
+  (chips, category, dates) unfolds below with `max-md:hidden max-md:basis-full peer-open:flex`. Desktop: no pill;
+  Produits/Stock one row; Commandes `md:contents` → status tab strip (text, 2px ink underline, hairline) on row 1,
+  dates + search on row 2.
 
 ## Design system mapping (Nike → this app)
 
@@ -644,6 +648,69 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   search + pill as Produits/Stock (statuses with counts in the fold), pill markup shared as `FiltersPill`,
   `ChipRow` deleted. Verified at 375px (AR): closed 40px, `?status=PENDING` → "(1)"; 1280px one row, no pill.
 
+### 2026-10-14 — Returned parcels (RETURNED status)
+- Request: some clients send products back; asked how to model it. Two cases: parcel refused / not collected
+  (cash on delivery's usual "retour", whole order, no money) and return after delivery (paid, per item).
+  User picked the first.
+- `OrderStatus.RETURNED` between `DELIVERED` and `CANCELLED`. No migration: `migrate diff` (DB vs schema) is
+  empty, SQLite keeps the enum as TEXT; only `prisma generate` (dev server stopped first, EPERM).
+- `FINAL_STATUSES` += `RETURNED`; new `UNSOLD_STATUSES` (`RETURNED`, `CANCELLED`) = stock back once in
+  `updateOrderStatus`, left out of the dashboard's value-per-day and best sellers. `RETURNED` is written only
+  over `SHIPPED` (conditional `updateMany`), and the orders select offers it only on shipped orders.
+  Badge: outline, sale red. FR "Retournée", AR "مُرتجَع". Chart titles lost their "(hors annulées)" /
+  "(articles, hors annulées)" notes (user: the titles are self-explanatory).
+- Verified (dev, AR): pending order's select has no Retournée, shipped one has; stale tab (order set CONFIRMED in
+  the DB) picking Retournée → stays CONFIRMED, stock 14; real pick → RETURNED, Chemise en lin Noir/M 14 → 15,
+  red final badge, tab count 1; dashboard 90 days: 16 600 DA = 22 500 − the returned 5 900. Order and stock put
+  back (SHIPPED, 14). typecheck, lint, 7 tests clean. DB backed up first (`prisma/backups/store-2026-10-14-13-56.db`).
+- The user's `npm run dev` window was stopped for `prisma generate`; dev now runs from the preview pane.
+
+### 2026-10-14 — Order note (confirmation call outcome)
+- User asked whether the statuses match a real COD flow: yes; the gaps were the confirmation call's outcome
+  (no answer, call back, customer's request) and courier payouts (`Livrée` = the courier has the cash, not the
+  shop). User picked the first: one free-text note per order instead of more statuses ("Pas de réponse"…).
+- Migration `order_note` (Prisma-generated table redefinition, rows kept): `Order.note String @default("")`.
+- `updateOrderNote(orderId, back, f)`: any status (final ones too, e.g. why a parcel came back), trimmed,
+  ≤ 500 chars, redirects to `back` + `saved=1` (toast). Commandes: one-line field + ✓ under the delivery block
+  (Enter saves), so the admin types it right after calling from the tel / WhatsApp links above (✓ removed later,
+  see "lighter desktop filters").
+- Verified (dev, AR): note typed + Enter → `?saved=1` toast, DB row, value kept after reload; 375px full-width
+  field, no sideways scroll; 1280px field 228px, no table overflow. Test note cleared. typecheck, lint clean.
+  DB backed up first (`prisma/backups/store-2026-10-14-14-07.db`).
+- Seen meanwhile: order ODVOFJ26 went En attente → Expédiée between two checks, not through any step of this
+  session (user's own testing, presumably); left as is.
+
+### 2026-10-14 — Commandes: sort by column header
+- Date, Livraison (by wilaya) and Total headers are links: `?sort=<column>-<asc|desc>`; same column flips, another
+  starts at newest / highest first (wilaya A → Z); date-desc (the default) stays out of the URL. Ties: newest
+  first. `aria-sort` on the active `th`, arrow icon, muted ↕ on the others. Tabs, search (hidden input), pager
+  and the status/note `back` URLs keep the sort; a new sort goes back to page 1.
+- Not sortable: Statut (SQLite would sort the enum text alphabetically, not in flow order; the tabs filter it),
+  # and Articles. Wilaya sorts as text ("16 - Alger"), so wilayas group but codes aren't numeric.
+- Verified (dev, AR): total ↓ 6200 · 5900 · 5900 · 4500, ↑ reversed; wilaya ↑ → no address, Alger, Oran, Oran;
+  Date from another column → default, clean URL; again → `date-asc`; tab and search links carry `sort`.
+  typecheck, lint clean.
+
+### 2026-10-14 — Commandes: lighter desktop filters, date interval, subtle note
+- "Filters look saturated on desktop" (7 bordered status pills + search filled 960px). Desktop now uses the Nike
+  sub-nav tab strip: plain text, muted counts, 2px ink underline on the current status, hairline under the
+  strip; phones keep the pills in the Filtres fold (one `Link` with `max-md:` pill / `md:` tab classes).
+- Date interval: `?from=` / `?to=` (YYYY-MM-DD) from two native `<input type="date">` in their own GET form with an
+  "Appliquer" button (no auto-submit: typing a year fires `change` at every digit) and a × that clears both.
+  Both days included, server time zone (same caveat as the dashboard); a reversed range is swapped. Desktop: row 2
+  = dates, search at the end; phones: in the fold, the two dates side by side. Pill counts it as one filter.
+- Status tab counts now follow the search and the dates (`groupBy` on everything but the status); the sidebar's
+  pending badge stays global. One `href(patch)` helper builds every URL (tabs, sort headers, pager, `back` of the
+  status and note forms, × link); `keep(...)` writes the hidden inputs of the two GET forms.
+- Note field (user: "make it subtle, the ✓ isn't needed"): borderless, reads as text, dashed underline on hover,
+  solid ink on focus, placeholder "Ajouter une note…". `NoteInput` (client): Enter submits natively, leaving the
+  field with a change submits too (no note lost by clicking away).
+- Verified (dev, AR): 1280px tabs on one 48px line, dates + search on row 2, note without border/button;
+  `?from=2026-10-12` → 0 rows, all counts 0; 11 → 11 oct. → 4; `from=11&to=01` swapped, status + sort kept in
+  tabs and search; Appliquer → `?from=2026-10-01&to=2026-10-11`; × → `/admin/orders`; note saved on focusout,
+  redirect kept the dates + `saved=1` toast, cleared the same way. 375px: closed 40px "(1)", open = pills, dates
+  side by side, button below, no sideways scroll. typecheck, lint clean. (A note "deez" on UMOC59EO is the user's.)
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - **TODO (planned) — Working with Yalidine (delivery company).** Not decided how deep; options below.
@@ -697,11 +764,19 @@ Keep this section last; update it when something here gets done or newly found.
   Categories: folds opened by hand close after every save (only the `?open=` group reopens); the old
   `/admin/categories` URL is a 404.
 - WhatsApp button only on product pages (admin orders have a per-customer WhatsApp link).
-- Admin on phones: Stock's sort toggle lives in the (hidden) table header, so phones get the default
-  order (lowest stock first) only; inventory saves one row per click and reload. Produits list still
+- Admin on phones: Stock's sort toggle and Commandes' sortable headers live in the (hidden) table header, so
+  phones get the default order only (lowest stock first / newest first; sort chips in the Filtres fold would fix it); inventory saves one row per click and reload. Produits list still
   scrolls sideways a little (487px, read-only).
-- A Livrée/Annulée set by mistake can only be undone in the DB (`npx prisma studio`; on a cancel, take the
-  stock back by hand too). A stale tab picking a status on an order finalized elsewhere gets no message.
+- A Livrée/Retournée/Annulée set by mistake can only be undone in the DB (`npx prisma studio`; on a return or
+  cancel, take the stock back by hand too). A stale tab picking a status on an order finalized elsewhere (or
+  Retournée on an order no longer shipped) gets no message.
+- Courier payouts: "Encaissé (commandes livrées)" counts `DELIVERED`, but with a courier the cash reaches the
+  shop later, in payouts minus fees, so the tile overstates money in hand. Relabel it, or add a payout date per
+  order with the Yalidine work. Order notes aren't searchable (add `note: { contains: q }` to the search).
+- Returns: only whole parcels coming back before payment (`RETURNED`). No return after delivery (paid, then an
+  item sent back): planned shape is `OrderItem.returnedQty` (stock +, revenue −), a `Return`/`ReturnItem`
+  table only if dates, reasons, partial refunds or not restocking damaged items are needed. A returned parcel
+  is restocked whole (fix damaged items on the Stock page). No refusal count per phone yet (a query, no schema).
 - No pagination on the storefront catalog; reuse `paginate`/`Pager`.
 - PDP: switching color keeps a size that may not exist there (greyed "Ajouter au panier", no reason);
   a single-image product still shows a 1-thumbnail rail; add-to-cart toast timer isn't reset on a second

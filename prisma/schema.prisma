@@ -14,12 +14,14 @@ enum Role {
 }
 
 // Cash on delivery: PENDING → CONFIRMED (customer called) → SHIPPED → DELIVERED (cash received).
-// CANCELLED puts the items back in stock. Declaration order = order shown in the admin.
+// RETURNED (parcel refused or not collected, back in the shop; only after SHIPPED) and CANCELLED put
+// the items back in stock. Declaration order = order shown in the admin.
 enum OrderStatus {
   PENDING
   CONFIRMED
   SHIPPED
   DELIVERED
+  RETURNED
   CANCELLED
 }
 
@@ -91,6 +93,7 @@ model Order {
   phone       String      @default("")
   wilaya      String      @default("")
   address     String      @default("")
+  note        String      @default("") // admin only: call outcome, call back at…, customer's request
   createdAt   DateTime    @default(now())
   items       OrderItem[]
 }
