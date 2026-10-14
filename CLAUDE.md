@@ -57,8 +57,10 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - **Money**: integer dinars (DZD), formatted with `formatPrice()`.
 - **Order statuses** follow cash on delivery: `PENDING → CONFIRMED → SHIPPED → DELIVERED`, or
   `CANCELLED`. The enum's declaration order is the admin's display order (`Object.values(OrderStatus)`).
-  Stock is taken at checkout, given back on cancel and taken again on reopen — only through
-  `updateOrderStatus`. Revenue counts `DELIVERED` only.
+  `DELIVERED` and `CANCELLED` are **final** (`FINAL_STATUSES` in `lib/utils.ts`): `updateOrderStatus`
+  only writes to an open order, the orders page shows a badge instead of the select, and picking a final
+  status asks first (`FormSelect confirm`). Stock is taken at checkout and given back once on cancel —
+  only through `updateOrderStatus`. Revenue counts `DELIVERED` only.
 - **Writes** are Server Actions (`lib/actions/*`). Every admin action calls `requireAdmin()` itself;
   `proxy.ts` is only the first gate.
 - **Admin feedback**: actions redirect with `?saved=1` or `?error=<key>` (a key of `t.admin`); `Notice`
@@ -111,6 +113,10 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   rounded ends, solid hairline grid, never two y-axes (counts and dinars are separate charts).
   Charts render `dir="ltr"` in Arabic too. Each chart has `accessibilityLayer` (keyboard + tooltip);
   rankings carry their value at the bar tip, the per-day values have an `sr-only` table.
+- **Admin tables on phones**: a table whose rows hold inputs, buttons or a status uses `<Table stack>`:
+  below `md` the header is hidden and each row wraps its cells (no sideways scroll). Per cell:
+  `max-md:basis-full` = own line, `max-md:ms-auto` = pushed to the end, `data-label={…}` = small caption
+  above the value (replaces the hidden header for inputs). Read-only lists (Produits) stay plain tables.
 
 ## Design system mapping (Nike → this app)
 
@@ -585,6 +591,37 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   visible on both, selected → "Noir · Épuisé"; Arabic title "· نفد المخزون". Stock restored from the saved
   values. typecheck, lint, 8 tests clean. DB backed up first (`prisma/backups/store-2026-10-14-10-10.db`).
 
+### 2026-10-14 — Admin on phones: stacked tables, sticky nav
+- Complaint: on phones, tables whose last column is an action or a state needed a sideways scroll to reach
+  it (375px: Commandes 832px wide, Stock 730, Catégories ~700, Variantes 484). Branch `admin-tables-mobile`.
+- Sticky last column was considered and dropped: on Variantes the price/stock inputs sit mid-row, and on
+  Stock the pinned form hid the color/size of the row being edited.
+- `Table stack` (`components/ui/table.tsx`, see Conventions) on Commandes (ref + date / delivery / items /
+  total + status select at the end), Stock (product / color, size, référence, price / "Stock" input + save),
+  Variantes (color + size / référence / Prix · Stock · delete) and Catégories (name + parent + save form,
+  then count + delete; the `?category=` slug is hidden on phones, name/parent fields grow to the line).
+  Variantes' référence: `dir="ltr"` moved to an inner span, so the line follows the page direction in Arabic.
+- Admin nav sticky on phones: the `<aside>` is `display: contents` below `md`, so the nav row alone
+  (56px) sticks to the top; store name and links scroll away. Desktop sidebar unchanged.
+- Verified (dev, user's own server, 375px): all four tables scrollWidth = clientWidth, page 375px wide,
+  nav pinned while scrolled; Arabic orders + Variantes mirrored; 1280px: sidebar and tables as before.
+  No data written. typecheck, lint, 8 tests clean.
+
+### 2026-10-14 — Delivered and cancelled orders are final
+- User: "delivered and canceled states are final". Same branch `admin-tables-mobile`.
+- `updateOrderStatus`: one conditional `updateMany` (`status notIn FINAL_STATUSES`); stock goes back only
+  when that write landed and the new status is `CANCELLED`, so a stale tab or double submit can neither
+  change a final order nor give its stock back twice. The reopen path (take stock again, `?error=noStock`),
+  `stockDirection` and its test are deleted; `t.admin.noStock` → `confirmFinal`.
+- Orders page: final orders show a `Badge` (Livrée soft-cloud, Annulée outline/mute) instead of the select.
+  `FormSelect` gained `confirm: { values, message }` (plain data, so server pages can pass it): picking
+  Livrée/Annulée asks "Ce statut est définitif…"; "no" remounts the select on its old value, nothing posted.
+- Verified (dev, 375px): "no" → still En attente, nothing posted; "yes" → Annulée badge, Oxford Blanc/M
+  7 → 8; order set CANCELLED in the DB then "Annulée" picked from the stale page → chino stock stays 7;
+  order set DELIVERED in the DB then "En attente" picked → stays Livrée, no prompt for a non-final pick.
+  Statuses and stock restored to the starting values. typecheck, lint, 7 tests clean.
+  DB backed up first (`prisma/backups/store-2026-10-14-11-49.db`).
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - `docker build` never run yet (Docker Desktop not initialized on the dev machine). The first build may need fixes.
@@ -612,7 +649,11 @@ Keep this section last; update it when something here gets done or newly found.
   Categories: folds opened by hand close after every save (only the `?open=` group reopens); the old
   `/admin/categories` URL is a 404.
 - WhatsApp button only on product pages (admin orders have a per-customer WhatsApp link).
-- Admin on phones: orders table scrolls sideways (6 columns); inventory saves one row per click and reload.
+- Admin on phones: Stock's sort toggle lives in the (hidden) table header, so phones get the default
+  order (lowest stock first) only; inventory saves one row per click and reload. Produits list still
+  scrolls sideways a little (487px, read-only).
+- A Livrée/Annulée set by mistake can only be undone in the DB (`npx prisma studio`; on a cancel, take the
+  stock back by hand too). A stale tab picking a status on an order finalized elsewhere gets no message.
 - No pagination on the storefront catalog; reuse `paginate`/`Pager`.
 - PDP: switching color keeps a size that may not exist there (greyed "Ajouter au panier", no reason);
   a single-image product still shows a 1-thumbnail rail; add-to-cart toast timer isn't reset on a second

@@ -9,7 +9,7 @@ import { db } from "@/lib/db"
 import { decodeText, parseCsv, planImport, type ImportState } from "@/lib/csv"
 import { fill, getI18n, getSettings } from "@/lib/i18n"
 import { MIME, UPLOAD_DIR } from "@/lib/uploads"
-import { makeSku, slugify, stockDirection, unique } from "@/lib/utils"
+import { FINAL_STATUSES, makeSku, slugify, unique } from "@/lib/utils"
 
 // Every action re-checks the role: proxy.ts guards pages, not direct action calls.
 
@@ -270,36 +270,20 @@ export async function updateStock(variantId: string, f: FormData) {
   done()
 }
 
-class StockError extends Error {}
-
 // `back` = the orders URL with its tab/search, so the redirect keeps them (and drops an old ?error).
 export async function updateOrderStatus(orderId: string, back: string, f: FormData) {
   await requireAdmin()
   if (!back.startsWith("/admin/orders")) back = "/admin/orders"
   const to = str(f, "status") as OrderStatus
   if (!Object.values(OrderStatus).includes(to)) return
-  try {
-    await db.$transaction(async (tx) => {
-      const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { items: true } })
-      // Conditional on the status just read: a double submit can't move stock twice.
-      const { count } = await tx.order.updateMany({ where: { id: orderId, status: o.status }, data: { status: to } })
-      const dir = count ? stockDirection(o.status, to) : 0
-      for (const i of o.items) {
-        if (dir > 0) await tx.productVariant.update({ where: { id: i.variantId }, data: { stockCount: { increment: i.quantity } } })
-        if (dir < 0) {
-          // Reopening a cancelled order takes the items again, only if they're still in stock.
-          const { count } = await tx.productVariant.updateMany({
-            where: { id: i.variantId, stockCount: { gte: i.quantity } },
-            data: { stockCount: { decrement: i.quantity } },
-          })
-          if (!count) throw new StockError()
-        }
-      }
-    })
-  } catch (e) {
-    if (e instanceof StockError) redirect(`${back}${back.includes("?") ? "&" : "?"}error=noStock`)
-    throw e
-  }
+  await db.$transaction(async (tx) => {
+    // Only an open order changes: a final one (stale tab, double submit) is left as is,
+    // so a cancel gives the stock back exactly once.
+    const { count } = await tx.order.updateMany({ where: { id: orderId, status: { notIn: FINAL_STATUSES } }, data: { status: to } })
+    if (!count || to !== "CANCELLED") return
+    for (const i of await tx.orderItem.findMany({ where: { orderId } }))
+      await tx.productVariant.update({ where: { id: i.variantId }, data: { stockCount: { increment: i.quantity } } })
+  })
   done()
   redirect(back)
 }

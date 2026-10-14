@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { categoryOptions, listHref, listParams, makeSku, paginate, slugify, sortSizes, stockDirection, swatch } from "./utils"
+import { categoryOptions, listHref, listParams, makeSku, paginate, slugify, sortSizes, swatch } from "./utils"
 
 test("slugify strips accents, keeps arabic", () => {
   assert.equal(slugify("Chemise en Lin été"), "chemise-en-lin-ete")
@@ -16,13 +16,6 @@ test("sku + swatch", () => {
   assert.equal(makeSku("chino", "Bleu ciel", "M"), "CHINO-BLEU-CIEL-M")
   assert.equal(swatch("Noir"), "#111111")
   assert.equal(swatch("navy"), "navy")
-})
-
-test("order status → stock direction", () => {
-  assert.equal(stockDirection("SHIPPED", "CANCELLED"), 1)
-  assert.equal(stockDirection("CANCELLED", "PENDING"), -1)
-  assert.equal(stockDirection("CANCELLED", "CANCELLED"), 0)
-  assert.equal(stockDirection("PENDING", "DELIVERED"), 0)
 })
 
 test("admin list params, URLs, pagination", () => {

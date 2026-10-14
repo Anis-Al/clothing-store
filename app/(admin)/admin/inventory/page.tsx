@@ -36,7 +36,7 @@ export default async function Inventory({ searchParams }: PageProps<"/admin/inve
     <div className="flex flex-col gap-6">
       <h1 className="text-[32px] font-medium">{t.admin.inventory} <span className="text-mute tabular-nums">({total})</span></h1>
       <ListFilters t={t} path={PATH} cur={cur} categories={categories} placeholder={t.admin.searchStock} />
-      <Table>
+      <Table stack>
         <TableHeader>
           <TableRow>
             <TableHead>{t.admin.product}</TableHead>
@@ -53,11 +53,11 @@ export default async function Inventory({ searchParams }: PageProps<"/admin/inve
         <TableBody>
           {variants.map((v) => (
             <TableRow key={v.id}>
-              <TableCell><Link href={`/admin/products/${v.productId}`} className="font-medium hover:underline">{v.product.name}</Link></TableCell>
+              <TableCell className="max-md:basis-full"><Link href={`/admin/products/${v.productId}`} className="font-medium hover:underline">{v.product.name}</Link></TableCell>
               <TableCell>{v.color} / {v.size}</TableCell>
               <TableCell className="font-mono text-xs text-mute" dir="ltr">{v.sku}</TableCell>
               <TableCell>{formatPrice(v.price, locale)}</TableCell>
-              <TableCell>
+              <TableCell data-label={t.admin.stock} className="max-md:basis-full">
                 {/* inline edit: one tiny form per row */}
                 <form action={updateStock.bind(null, v.id)} className="flex items-center gap-2">
                   <Input name="stock" type="number" min={0} defaultValue={v.stockCount} aria-label={t.admin.stock} dir="ltr"

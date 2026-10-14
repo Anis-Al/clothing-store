@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { OrderStatus, type Prisma } from "@prisma/client"
 import { Search } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Notice, Pager } from "@/components/admin/fields"
 import { FormSelect } from "@/components/form-select"
@@ -8,7 +9,7 @@ import { WhatsAppIcon } from "@/components/whatsapp-icon"
 import { updateOrderStatus } from "@/lib/actions/admin"
 import { db } from "@/lib/db"
 import { formatDate, formatPrice, getI18n } from "@/lib/i18n"
-import { cn, listParams, paginate } from "@/lib/utils"
+import { cn, FINAL_STATUSES, listParams, paginate } from "@/lib/utils"
 
 const STATUSES = Object.values(OrderStatus) // schema order: the COD flow
 const PER_PAGE = 10
@@ -67,7 +68,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
             className="h-10 w-64 rounded-[24px] bg-cloud ps-10 pe-4 outline-none focus:bg-canvas focus:ring-2 focus:ring-ink" />
         </form>
       </div>
-      <Table>
+      <Table stack>
         <TableHeader>
           <TableRow>
             <TableHead>#</TableHead>
@@ -83,7 +84,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
             <TableRow key={o.id} className="align-top">
               <TableCell className="font-mono text-xs" dir="ltr">{o.id.slice(-8).toUpperCase()}</TableCell>
               <TableCell>{formatDate(o.createdAt, locale)}</TableCell>
-              <TableCell className="min-w-48 whitespace-normal text-sm">
+              <TableCell className="min-w-48 whitespace-normal text-sm max-md:basis-full">
                 {o.wilaya ? (
                   <>
                     <p className="font-medium">{o.fullName}</p>
@@ -99,18 +100,24 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                   </>
                 ) : "—"}
               </TableCell>
-              <TableCell className="min-w-56 whitespace-normal">
+              <TableCell className="min-w-56 whitespace-normal max-md:basis-full">
                 <ul className="text-sm">
                   {o.items.map((i) => <li key={i.id}>{i.quantity} × {i.variant.product.name} ({i.variant.color} / {i.variant.size})</li>)}
                 </ul>
               </TableCell>
               <TableCell className="font-medium">{formatPrice(o.totalAmount, locale)}</TableCell>
-              <TableCell>
-                <form action={updateOrderStatus.bind(null, o.id, tab(status, page))}>
-                  <FormSelect name="status" autoSubmit size="sm" defaultValue={o.status} aria-label={t.admin.status}
-                    className={cn("w-40", o.status === "PENDING" && "font-medium", o.status === "CANCELLED" && "text-mute")}
-                    items={STATUSES.map((s) => ({ value: s, label: t.status[s] }))} />
-                </form>
+              <TableCell className="max-md:ms-auto">
+                {FINAL_STATUSES.includes(o.status) ? (
+                  <Badge variant={o.status === "CANCELLED" ? "outline" : "secondary"}
+                    className={cn("h-9 px-4 text-sm", o.status === "CANCELLED" && "text-mute")}>{t.status[o.status]}</Badge>
+                ) : (
+                  <form action={updateOrderStatus.bind(null, o.id, tab(status, page))}>
+                    <FormSelect name="status" autoSubmit size="sm" defaultValue={o.status} aria-label={t.admin.status}
+                      confirm={{ values: FINAL_STATUSES, message: t.admin.confirmFinal }}
+                      className={cn("w-40", o.status === "PENDING" && "font-medium")}
+                      items={STATUSES.map((s) => ({ value: s, label: t.status[s] }))} />
+                  </form>
+                )}
               </TableCell>
             </TableRow>
           ))}

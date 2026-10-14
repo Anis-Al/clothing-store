@@ -1,3 +1,5 @@
+import type { OrderStatus } from "@prisma/client"
+
 export { cn } from "cn"
 
 export function slugify(s: string) {
@@ -77,6 +79,5 @@ export function paginate(total: number, page: number, perPage: number) {
   return { pages, page: current, skip: (current - 1) * perPage, take: perPage }
 }
 
-// Order status change → stock: +1 puts the items back (cancel), -1 takes them again (reopen), 0 leaves it.
-export const stockDirection = (from: string, to: string) =>
-  from === to || (from !== "CANCELLED" && to !== "CANCELLED") ? 0 : to === "CANCELLED" ? 1 : -1
+// Delivered and cancelled orders never change status again (so a cancel gives the stock back once).
+export const FINAL_STATUSES: OrderStatus[] = ["DELIVERED", "CANCELLED"]

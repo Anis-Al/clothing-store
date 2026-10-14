@@ -95,7 +95,7 @@ export default async function EditProduct({ params, searchParams }: PageProps<"/
             <ProductFields t={t} categories={categories} p={p} />
             <section className="flex flex-col gap-4 border-t border-hairline pt-6">
               <h2 className="text-2xl font-medium">{t.admin.variants} <span className="text-mute tabular-nums">({variants.length})</span></h2>
-              <Table>
+              <Table stack>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t.admin.color}</TableHead>
@@ -116,13 +116,13 @@ export default async function EditProduct({ params, searchParams }: PageProps<"/
                         </span>
                       </TableCell>
                       <TableCell className="font-medium">{v.size}</TableCell>
-                      <TableCell className="font-mono text-xs text-mute" dir="ltr">{v.sku}</TableCell>
-                      <TableCell><Input name={`price_${v.id}`} type="number" min={1} defaultValue={v.price} className="h-9 w-28" dir="ltr" /></TableCell>
-                      <TableCell>
+                      <TableCell className="font-mono text-xs text-mute max-md:basis-full max-md:pt-0"><span dir="ltr">{v.sku}</span></TableCell>
+                      <TableCell data-label={t.admin.price}><Input name={`price_${v.id}`} type="number" min={1} defaultValue={v.price} className="h-9 w-28" dir="ltr" /></TableCell>
+                      <TableCell data-label={t.admin.stock}>
                         <Input name={`stock_${v.id}`} type="number" min={0} defaultValue={v.stockCount} dir="ltr"
                           className={cn("h-9 w-20", v.stockCount === 0 ? "text-sale" : v.stockCount <= lowStock && "text-[#b45309]")} />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="max-md:ms-auto max-md:self-end">
                         <ConfirmButton message={t.admin.confirmDelete} formAction={deleteVariant.bind(null, p.id, v.id)}
                           aria-label={t.admin.delete} className="grid size-9 place-items-center rounded-full text-mute hover:bg-cloud hover:text-sale">
                           <Trash2 className="size-5" />

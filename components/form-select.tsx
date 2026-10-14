@@ -1,13 +1,14 @@
 "use client"
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 type Item = { value: string; label: React.ReactNode }
 
 // shadcn Select for plain <form>s: Base UI renders a hidden input named `name`, so server actions and
-// FormData read it like a native <select>. `autoSubmit` submits the surrounding form on change.
+// FormData read it like a native <select>. `autoSubmit` submits the surrounding form on change;
+// picking one of `confirm.values` asks `confirm.message` first, and "no" puts the old value back.
 export function FormSelect({
-  name, items, defaultValue, placeholder, required, autoSubmit, size, className, "aria-label": ariaLabel,
+  name, items, defaultValue, placeholder, required, autoSubmit, confirm, size, className, "aria-label": ariaLabel,
 }: {
   name: string
   items: Item[]
@@ -15,22 +16,27 @@ export function FormSelect({
   placeholder?: string
   required?: boolean
   autoSubmit?: boolean
+  confirm?: { values: string[]; message: string }
   size?: "sm" | "default"
   className?: string
   "aria-label"?: string
 }) {
   const input = useRef<HTMLInputElement>(null)
+  const [resets, setResets] = useState(0)
   return (
     <Select
       // remount when the server sends a new default (e.g. after a status save) — Base UI warns otherwise
-      key={defaultValue ?? ""}
+      key={`${defaultValue ?? ""}-${resets}`}
       name={name}
       items={items}
       required={required}
       defaultValue={defaultValue || null}
       inputRef={input}
       // wait one tick so the hidden input holds the new value before submitting
-      onValueChange={autoSubmit ? () => setTimeout(() => input.current?.form?.requestSubmit()) : undefined}
+      onValueChange={autoSubmit ? (v) => {
+        if (confirm?.values.includes(v as string) && !window.confirm(confirm.message)) return setResets((n) => n + 1)
+        setTimeout(() => input.current?.form?.requestSubmit())
+      } : undefined}
     >
       <SelectTrigger size={size} className={className} aria-label={ariaLabel}>
         <SelectValue placeholder={placeholder} />

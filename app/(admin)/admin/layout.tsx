@@ -20,9 +20,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ]
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
-      <aside className="flex shrink-0 flex-col gap-1 bg-ink p-4 text-canvas md:w-60 md:p-6">
-        <Link href="/admin" className="mb-4 font-display text-3xl tracking-wide">{t.store.name}</Link>
-        <nav className="flex gap-1 overflow-x-auto md:flex-col">
+      {/* phones: the aside is display: contents, so the nav row alone sticks to the top while the
+          store name and the links below it scroll away */}
+      <aside className="contents text-canvas md:flex md:w-60 md:shrink-0 md:flex-col md:gap-1 md:bg-ink md:p-6">
+        <Link href="/admin" className="bg-ink px-4 pt-4 pb-2 font-display text-3xl tracking-wide md:mb-4 md:p-0">{t.store.name}</Link>
+        <nav className="sticky top-0 z-30 flex gap-1 overflow-x-auto bg-ink px-4 py-2 md:static md:flex-col md:p-0">
           {links.map(([href, label]) => (
             <Link key={href} href={href} className="flex items-center gap-2 rounded-full px-4 py-2 font-medium whitespace-nowrap hover:bg-charcoal">
               {label}
@@ -32,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </Link>
           ))}
         </nav>
-        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-stone md:mt-auto md:flex-col">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 bg-ink px-4 pt-2 pb-4 text-sm text-stone md:mt-auto md:flex-col md:p-0">
           <Link href="/" className="hover:text-canvas">{t.admin.backToStore}</Link>
           <form action={setLocale.bind(null, locale === "ar" ? "fr" : "ar")}>
             <button type="submit" className="hover:text-canvas">{locale === "ar" ? "Français" : "العربية"}</button>

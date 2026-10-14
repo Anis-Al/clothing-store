@@ -3,7 +3,8 @@
 import * as React from "react"
 import { cn } from "cn"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+// stack: below md the header is hidden and each row wraps its cells (no sideways scroll)
+function Table({ className, stack, ...props }: React.ComponentProps<"table"> & { stack?: boolean }) {
   return (
     <div
       data-slot="table-container"
@@ -11,7 +12,11 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     >
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-sm", className)}
+        className={cn(
+          "w-full caption-bottom text-sm",
+          stack && "max-md:block max-md:[&_tbody]:block max-md:[&_thead]:hidden max-md:[&_tr]:flex max-md:[&_tr]:flex-wrap max-md:[&_tr]:items-center max-md:[&_td]:whitespace-normal",
+          className
+        )}
         {...props}
       />
     </div>
@@ -83,6 +88,8 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
       data-slot="table-cell"
       className={cn(
         "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pe-0",
+        // stacked rows have no header: data-label captions the cell instead
+        "max-md:data-label:flex max-md:data-label:flex-col max-md:data-label:items-start max-md:data-label:gap-1 max-md:data-label:before:text-xs max-md:data-label:before:text-mute max-md:data-label:before:content-[attr(data-label)]",
         className
       )}
       {...props}
