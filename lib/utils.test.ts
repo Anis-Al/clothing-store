@@ -81,8 +81,17 @@ test("CSV import: parse, decode, plan", async () => {
   assert.deepEqual(plan("Nom;Catégorie;Couleur;Taille;Prix;Stock\n;;;;;").errors, ["Le fichier ne contient aucune ligne de produit."])
 })
 
-test("DZ phone + wilaya validation", async () => {
-  const { normalizePhone, isWilaya, WILAYAS } = await import("./wilayas")
+test("DZ phone + wilaya + commune validation", async () => {
+  const { normalizePhone, isWilaya, isCommune, communesOf, WILAYAS } = await import("./wilayas")
+  const { COMMUNES } = await import("./communes")
+  // every wilaya has its communes, under the same code
+  assert.deepEqual(Object.keys(COMMUNES).sort(), WILAYAS.map(([code]) => code))
+  assert.equal(Object.values(COMMUNES).flat().length, 1541)
+  const [first] = communesOf("16 - Alger")
+  assert.ok(isCommune("16 - Alger", first[0]))
+  assert.ok(!isCommune("31 - Oran", first[0])) // commune of another wilaya
+  assert.ok(!isCommune("16 - Alger", first[1])) // Arabic label is not the stored value
+  assert.ok(!isCommune("16 - Alger", ""))
   assert.equal(normalizePhone("0555 12 34 56"), "0555123456")
   assert.equal(normalizePhone("+213 661-22-33-44"), "0661223344")
   assert.equal(normalizePhone("00213799887766"), "0799887766")

@@ -1,3 +1,5 @@
+import { COMMUNES } from "./communes"
+
 // The 58 wilayas (2019 division). Order stores "code - French name"; labels follow the UI locale.
 export const WILAYAS: [code: string, fr: string, ar: string][] = [
   ["01", "Adrar", "أدرار"], ["02", "Chlef", "الشلف"], ["03", "Laghouat", "الأغواط"], ["04", "Oum El Bouaghi", "أم البواقي"],
@@ -19,6 +21,9 @@ export const WILAYAS: [code: string, fr: string, ar: string][] = [
 
 export const wilayaValue = ([code, fr]: (typeof WILAYAS)[number]) => `${code} - ${fr}`
 export const isWilaya = (v: string) => WILAYAS.some((w) => wilayaValue(w) === v)
+// Communes of a stored wilaya value ("16 - Alger" → COMMUNES["16"]); orders store the commune's Latin name.
+export const communesOf = (wilaya = "") => COMMUNES[wilaya.slice(0, 2)] ?? []
+export const isCommune = (wilaya: string, v: string) => isWilaya(wilaya) && communesOf(wilaya).some(([fr]) => fr === v)
 
 // Algerian mobile: 05/06/07 + 8 digits, also +213 / 00213 prefixes. Stored as 0XXXXXXXXX.
 export function normalizePhone(raw: string) {

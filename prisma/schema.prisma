@@ -92,7 +92,8 @@ model Order {
   fullName    String      @default("")
   phone       String      @default("")
   wilaya      String      @default("")
-  address     String      @default("")
+  commune     String      @default("") // Latin name from lib/communes.ts; "" on orders placed before communes
+  address     String      @default("") // street, n°, district (before communes: commune included)
   note        String      @default("") // admin only: call outcome, call back at…, customer's request
   createdAt   DateTime    @default(now())
   items       OrderItem[]

@@ -1,7 +1,7 @@
 "use server"
 import { db } from "@/lib/db"
 import { fill, getI18n, getSettings } from "@/lib/i18n"
-import { isWilaya, normalizePhone } from "@/lib/wilayas"
+import { isCommune, normalizePhone } from "@/lib/wilayas"
 
 class StockError extends Error {}
 class PriceError extends Error {
@@ -14,7 +14,7 @@ class PriceError extends Error {
 
 // Guest checkout, cash on delivery. Prices come from the DB, never from the client: the prices and fee the
 // cart showed (`price`, `fee`) are only compared, so the customer never orders at a total they didn't see.
-export type Shipping = { fullName: string; phone: string; wilaya: string; address: string }
+export type Shipping = { fullName: string; phone: string; wilaya: string; commune: string; address: string }
 
 export async function checkout(lines: { variantId: string; qty: number; price: number }[], fee: number, shipping: Shipping) {
   const { t } = await getI18n()
@@ -33,7 +33,9 @@ export async function checkout(lines: { variantId: string; qty: number; price: n
   const fullName = String(shipping?.fullName ?? "").trim().slice(0, 100)
   const address = String(shipping?.address ?? "").trim().slice(0, 300)
   const wilaya = String(shipping?.wilaya ?? "")
-  if (!fullName || !address || !isWilaya(wilaya)) return { error: t.cart.missing }
+  const commune = String(shipping?.commune ?? "")
+  // the commune must belong to the wilaya: couriers need both exactly
+  if (!fullName || !address || !isCommune(wilaya, commune)) return { error: t.cart.missing }
   const phone = normalizePhone(String(shipping?.phone ?? ""))
   if (!phone) return { error: t.cart.badPhone }
 
@@ -60,7 +62,7 @@ export async function checkout(lines: { variantId: string; qty: number; price: n
         data: {
           totalAmount: total + deliveryFee,
           shippingFee: deliveryFee,
-          fullName, phone, wilaya, address,
+          fullName, phone, wilaya, commune, address,
           items: { create: [...qty].map(([variantId, quantity]) => ({ variantId, quantity, priceAtPurchase: variants.find((v) => v.id === variantId)!.price })) },
         },
       })

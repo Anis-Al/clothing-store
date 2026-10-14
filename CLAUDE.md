@@ -43,7 +43,7 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 
 ## Conventions
 
-- **No customer accounts.** Guest checkout only (name, phone, wilaya, address; cash on delivery).
+- **No customer accounts.** Guest checkout only (name, phone, wilaya, commune, address; cash on delivery).
   The only login is the admin's (`/login`, unlinked). Don't reintroduce register/account pages.
 - **i18n**: `lib/dict.ts` holds the `fr` and `ar` dictionaries (same shape, `fr` is the type source) and
   is the only i18n file client components may import. `lib/i18n.ts` is server-only (reads the DB) and
@@ -68,6 +68,10 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - **Admin feedback**: actions redirect with `?saved=1` or `?error=<key>` (a key of `t.admin`); `Notice`
   shows it as a bottom-end toast. Keep the page's own params in that redirect (settings `tab`, list
   filters, orders `back`, categories `open`), or the admin lands somewhere else after each save.
+- **Commandes URL** (`/admin/orders`): `status`, `q`, `sort` (`date|wilaya|total` + `-asc|-desc`, none = newest
+  first), `from` / `to` (YYYY-MM-DD), `page`. Every tab, header, pager link and every `back` passed to the status
+  and note actions comes from `href(patch)` in the page; the two GET forms carry the rest with `keep(...)`.
+  A new param goes into `cur` there, or saves and tab switches drop it.
 - **Images**: every upload goes through `saveUpload()` (`lib/actions/admin.ts`: jpg/png/webp/avif/gif,
   ≤ 8 MB, no SVG) into `public/uploads/` (created at boot by `instrumentation.ts`), URL
   `/uploads/<Date.now()>-<name>`, kept in `Image` (products) or `Settings.heroImage`. Deleting the row
@@ -102,6 +106,10 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   tab. Catégories is the last tab, its own route. Read with `getSettings()` (`lib/i18n.ts`, React
   `cache` = one query per request). Empty text = dictionary default. Never hard-code the "Stock faible"
   `3` again: use `lowStock`.
+- **Wilaya + commune**: `lib/wilayas.ts` (58 wilayas, value `"16 - Alger"`) and `lib/communes.ts` (1541 communes
+  from the user's CSV, keyed by wilaya **code**, `[latin, arabic]`). Orders store the commune's Latin name; labels
+  follow the UI language. `checkout` refuses a commune outside the posted wilaya (`isCommune`). Never rename stored
+  wilaya values: map spellings to a courier's list (Yalidine) at export / API time.
 - **Delivery fee**: flat, from Réglages, re-read by `checkout` (never from the client).
   `Order.totalAmount` = items + `Order.shippingFee` (the fee at checkout time); revenue includes it.
 - **Checkout price check**: the cart sends the prices and fee it displayed; if any differs from the DB,
@@ -711,12 +719,49 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   redirect kept the dates + `saved=1` toast, cleared the same way. 375px: closed 40px "(1)", open = pills, dates
   side by side, button below, no sideways scroll. typecheck, lint clean. (A note "deez" on UMOC59EO is the user's.)
 
+### 2026-10-14 — Communes at checkout
+- User provided `algeria_cities.csv` (Downloads; not in the repo): 1541 communes, 58 wilayas, columns
+  `wilaya_code`, `commune_name_ascii` (Latin), `commune_name` (Arabic), plus daïras (unused).
+- `lib/communes.ts`: `COMMUNES[wilayaCode] = [latin, arabic][]`, sorted by Latin name (one-off conversion, 52 KB;
+  10 names had double spaces, collapsed; source spellings kept, e.g. "Zmalet El Emir Abdelkade"). Matched to our
+  wilayas by **code**: `lib/wilayas.ts` names stay (old orders store "16 - Alger"), though the CSV spells a few
+  differently (Bordj Bou Arreridj, El Meghaier, El Menia). `communesOf(wilaya)`, `isCommune(wilaya, v)`.
+- Migration `order_commune`: `Order.commune String @default("")`. `address` = street, n°, district (labels FR/AR).
+- Cart: commune `FormSelect` under the wilaya, disabled until a wilaya is picked, remounted empty when the wilaya
+  changes (`key`), labels in the UI language, value = Latin name; remembered in `atelier:shipping` with the rest.
+  `FormSelect` gained `onChange` and `disabled`. Checkout refuses a commune that isn't in the posted wilaya
+  (`t.cart.missing`, now naming the commune). Admin Livraison line: "Alger Centre, 16 - Alger".
+- Verified (dev, AR): commune disabled before a wilaya; 16 → 57 communes in Arabic, Latin order; Alger Centre
+  posts "Alger Centre"; wilaya forged to "31 - Oran" in the DOM → refused, no order; real order → DB commune
+  "Alger Centre", stock 5 → 4, /merci; admin line ok; next visit prefills both. Test order deleted, stock back to 5,
+  pane storage cleared. typecheck, lint, 7 tests (new commune asserts) clean. DB backed up first
+  (`prisma/backups/store-2026-10-14-14-36.db`).
+- Then (user: smaller cart column, bigger form): from `lg` the cart is 2fr items / 3fr total + form, and the form
+  pairs name | phone and wilaya | commune (address and button span both). md keeps the 360px form, phones one column.
+  1280px: items 452px, form 677px (was 360), form 634 → 450px tall; 1024px: 349 / 524; 375px no sideways scroll.
+  The total row is now a soft-cloud panel (was a hairline-bordered line) with the amount one size up (`text-lg`).
+
+### 2026-10-14 — Copy trims, tooling
+- Import page rules (`t.admin.importRules`, FR/AR) cut to six short lines. Dropped on purpose because the line
+  errors already say it: the `Main › Sub` form, price ≥ 1, "category and description from the first row", "name,
+  category and description of an existing product don't change".
+- Checkout: the "Mobile : 05, 06 ou 07…" hint under the phone field removed (user); `phoneHint` gone from the dict.
+  The `pattern` + `title` (badPhone) and the server's `normalizePhone` still guard the number.
+- Impeccable design hook: one finding on the Commandes status tab link (`border-accent-on-rounded`) is a false
+  positive (`max-md:rounded-full` and `md:border-b-2` never apply together); ignore scoped to that file in
+  `.impeccable/config.json`. `.impeccable/` (config + `hook.cache.json`) is left untracked: not app code; the
+  user hasn't said whether to commit the config or git-ignore the folder.
+- Dev server: since the RETURNED change it runs from the preview pane (`.claude/launch.json`, `dev`), not the
+  user's own window; schema changes in this session stopped it with `preview_stop` before `prisma migrate dev`.
+- Commits this session: `6c90e70` (phone filters), `b88b96d` (RETURNED, notes, sorting, date filter, desktop
+  tabs), then "Communes at checkout, wider cart form, copy trims" (communes, cart layout, import copy, phone hint).
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - **TODO (planned) — Working with Yalidine (delivery company).** Not decided how deep; options below.
-  **Step 0, needed by every option:** split the checkout address into wilaya (exists), **commune** (select)
-  and street address. The user will provide the Algerian localization data (wilayas / communes); don't
-  invent the list. Yalidine needs exact wilaya / commune names, so this comes first.
+  **Step 0 — done 2026-10-14:** checkout = wilaya + **commune** (select, `lib/communes.ts`) + street address.
+  Still to check against Yalidine's own list: our wilaya spellings (e.g. "El M'Ghair", "Bordj Bou Arréridj") and
+  the CSV's commune spellings may differ from theirs; map them at export / API time, don't rename stored values.
   Levels, lightest first (they stack):
   1. **Tracking number only**: admin pastes the Yalidine tracking (`yal-…`) on the order after creating the
      parcel in Yalidine's dashboard → shown in admin orders, can go in the WhatsApp message to the customer.
@@ -740,7 +785,7 @@ Keep this section last; update it when something here gets done or newly found.
   References: github.com/tarek-berkane/yalidine (Python), github.com/feeefapp/yalidine (TS, `npm i yalidine`);
   plain `fetch` is enough, no dependency needed.
 - `docker build` never run yet (Docker Desktop not initialized on the dev machine). The first build may need fixes.
-- Dashboard day buckets follow the server's time zone; the Docker image runs in UTC, so set
+- Dashboard day buckets and the Commandes date filter follow the server's time zone; the Docker image runs in UTC, so set
   `TZ=Africa/Algiers` there (untested) or orders placed between midnight and 1 am land on the day
   before. No "delivered on" date exists, so there is no revenue-over-time chart (only order value by
   order date).
@@ -748,8 +793,9 @@ Keep this section last; update it when something here gets done or newly found.
 - Categories: no manual order (alphabetical), no category images (home tiles use the latest product's).
   On touch tablets (≥768px) the hover menu doesn't open: tapping a main category opens its page, whose
   sub-row lists the sub-categories.
-- Delivery fee is one flat amount (Réglages): no per-wilaya fee or stop-desk option; commune is free
-  text in the address (see the Yalidine TODO above). Admin orders show the total only, not the fee part.
+- Delivery fee is one flat amount (Réglages): no per-wilaya fee or stop-desk option (see the Yalidine TODO
+  above). Admin orders show the total only, not the fee part. Orders placed before communes have `commune = ""`
+  (their commune is inside `address`). The commune select is a plain list with type-ahead (Tizi Ouzou: 67), no search box.
 - `createProduct`/`updateProduct` don't refuse a main category that has sub-categories (only the form
   hides it).
 - Store name is one value for both languages (FR/AR for tagline, hero title, delivery text only).

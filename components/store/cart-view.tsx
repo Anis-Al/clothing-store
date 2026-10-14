@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { checkout, type Shipping } from "@/lib/actions/checkout"
 import { useCart, useCartReady } from "@/lib/cart"
 import { formatPrice } from "@/lib/dict"
-import { WILAYAS, wilayaValue } from "@/lib/wilayas"
+import { communesOf, WILAYAS, wilayaValue } from "@/lib/wilayas"
 
 // Guest checkout: delivery details are remembered in this browser only (no accounts).
 function savedShipping(): Partial<Shipping> {
@@ -29,6 +29,7 @@ export function CartView({ fee }: { fee: number }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [error, setError] = useState<string>()
+  const [wilaya, setWilaya] = useState<string>() // set once the customer picks one; before that, the saved one
   const mounted = useCartReady()
 
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
@@ -63,6 +64,8 @@ export function CartView({ fee }: { fee: number }) {
 
   if (!mounted) return <div className="min-h-[50vh]" />
   const shipping = savedShipping()
+  const w = wilaya ?? shipping.wilaya ?? ""
+  const communes = communesOf(w)
 
   if (!items.length)
     return (
@@ -74,7 +77,8 @@ export function CartView({ fee }: { fee: number }) {
     )
 
   return (
-    <div className="grid gap-10 pt-8 pb-28 md:grid-cols-[minmax(0,1fr)_360px] md:pb-8">
+    // lg: items 2/5, total + delivery form 3/5 (the form pairs its fields there); md: form 360px
+    <div className="grid gap-10 pt-8 pb-28 md:grid-cols-[minmax(0,1fr)_360px] md:pb-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <section>
         <h1 className="mb-6 text-2xl font-medium md:text-[32px]">{t.cart.title}</h1>
         <ul>
@@ -114,12 +118,12 @@ export function CartView({ fee }: { fee: number }) {
         <dl className="flex flex-col gap-2">
           <div className="flex justify-between"><dt>{t.cart.subtotal}</dt><dd>{formatPrice(subtotal, locale)}</dd></div>
           <div className="flex justify-between"><dt>{t.cart.shipping}</dt><dd>{fee ? formatPrice(fee, locale) : t.cart.free}</dd></div>
-          <div className="flex justify-between border-y border-hairline py-4 font-medium">
-            <dt>{t.cart.total}</dt><dd>{formatPrice(total, locale)}</dd>
+          <div className="flex items-baseline justify-between bg-cloud p-4 font-medium">
+            <dt>{t.cart.total}</dt><dd className="text-lg">{formatPrice(total, locale)}</dd>
           </div>
         </dl>
-        <form id="checkout" onSubmit={onCheckout} className="flex scroll-mt-32 flex-col gap-4">
-            <h2 className="text-xl font-medium">{t.cart.delivery}</h2>
+        <form id="checkout" onSubmit={onCheckout} className="grid scroll-mt-32 gap-4 lg:grid-cols-2">
+            <h2 className="text-xl font-medium lg:col-span-2">{t.cart.delivery}</h2>
             <label className="flex flex-col gap-2 text-sm font-medium">
               {t.cart.fullName}
               <Input name="fullName" required maxLength={100} autoComplete="name" defaultValue={shipping.fullName} />
@@ -128,19 +132,26 @@ export function CartView({ fee }: { fee: number }) {
               {t.cart.phone}
               <Input name="phone" type="tel" required dir="ltr" autoComplete="tel" inputMode="tel" placeholder="0555 12 34 56"
                 pattern="(\+213|00213|0)[\s.\-]*[567]([\s.\-]*\d){8}" title={t.cart.badPhone} defaultValue={shipping.phone} />
-              <span className="text-xs font-normal text-mute">{t.cart.phoneHint}</span>
             </label>
             <label className="flex flex-col gap-2 text-sm font-medium">
               {t.cart.wilaya}
-              <FormSelect name="wilaya" required defaultValue={shipping.wilaya} placeholder={t.cart.chooseWilaya}
+              <FormSelect name="wilaya" required defaultValue={shipping.wilaya} placeholder={t.cart.chooseWilaya} onChange={setWilaya}
                 items={WILAYAS.map((w) => ({ value: wilayaValue(w), label: `${w[0]} - ${locale === "ar" ? w[2] : w[1]}` }))} />
             </label>
             <label className="flex flex-col gap-2 text-sm font-medium">
+              {t.cart.commune}
+              {/* key: a new wilaya remounts it empty (the saved commune belongs to the saved wilaya only).
+                  ponytail: all 1541 communes ship with the cart (~52 KB raw); dynamic import() if that ever matters */}
+              <FormSelect key={w} name="commune" required disabled={!communes.length} placeholder={t.cart.chooseCommune}
+                defaultValue={w === shipping.wilaya ? shipping.commune : undefined}
+                items={communes.map(([fr, ar]) => ({ value: fr, label: locale === "ar" ? ar : fr }))} />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-medium lg:col-span-2">
               {t.cart.address}
               <textarea name="address" required maxLength={300} rows={3} autoComplete="street-address" defaultValue={shipping.address}
                 className="w-full rounded-lg border border-hairline p-4 text-base font-normal outline-none focus:border-2 focus:border-ink" />
             </label>
-            <Button type="submit" disabled={pending} className="hidden w-full md:inline-flex">{pending ? t.cart.sending : t.cart.checkout}</Button>
+            <Button type="submit" disabled={pending} className="hidden w-full md:inline-flex lg:col-span-2">{pending ? t.cart.sending : t.cart.checkout}</Button>
           </form>
         {error && <p role="alert" className="hidden text-sm font-medium text-sale md:block">{error}</p>}
         <p className="text-xs text-mute">{t.cart.mockNote}</p>

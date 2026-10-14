@@ -156,7 +156,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                         <WhatsAppIcon className="size-5 text-[#25D366]" />
                       </a>
                     </p>
-                    <p>{o.wilaya}</p>
+                    <p>{o.commune && `${o.commune}, `}{o.wilaya}</p>
                     <p className="text-mute">{o.address}</p>
                   </>
                 ) : <p>—</p>}
