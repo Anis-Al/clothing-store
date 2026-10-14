@@ -740,6 +740,8 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   pairs name | phone and wilaya | commune (address and button span both). md keeps the 360px form, phones one column.
   1280px: items 452px, form 677px (was 360), form 634 → 450px tall; 1024px: 349 / 524; 375px no sideways scroll.
   The total row is now a soft-cloud panel (was a hairline-bordered line) with the amount one size up (`text-lg`).
+  The aside's heading says "Récapitulatif" / "ملخص الطلب" (`t.confirm.summary`, shared with /merci) instead of
+  a second "Total".
 
 ### 2026-10-14 — Copy trims, tooling
 - Import page rules (`t.admin.importRules`, FR/AR) cut to six short lines. Dropped on purpose because the line

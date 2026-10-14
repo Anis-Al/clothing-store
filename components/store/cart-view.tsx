@@ -114,7 +114,7 @@ export function CartView({ fee }: { fee: number }) {
       </section>
 
       <aside className="flex h-fit flex-col gap-4 md:sticky md:top-32">
-        <h2 className="text-2xl font-medium">{t.cart.total}</h2>
+        <h2 className="text-2xl font-medium">{t.confirm.summary}</h2>
         <dl className="flex flex-col gap-2">
           <div className="flex justify-between"><dt>{t.cart.subtotal}</dt><dd>{formatPrice(subtotal, locale)}</dd></div>
           <div className="flex justify-between"><dt>{t.cart.shipping}</dt><dd>{fee ? formatPrice(fee, locale) : t.cart.free}</dd></div>
