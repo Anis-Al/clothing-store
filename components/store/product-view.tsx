@@ -40,6 +40,7 @@ export function ProductView(props: {
   const selected = size ? byKey(color, size) : undefined
   const price = selected?.price ?? Math.min(...variants.filter((v) => v.color === color).map((v) => v.price))
   const canAdd = !!selected && selected.stockCount > 0
+  const soldOut = (c: string) => variants.every((v) => v.color !== c || v.stockCount === 0)
 
   function onAdd() {
     if (!selected) return
@@ -85,22 +86,27 @@ export function ProductView(props: {
 
         <fieldset className="mt-8">
           <legend className="mb-3 font-medium">
-            {t.product.selectColor} : <span className="text-mute">{color}</span>
+            {t.product.selectColor} : <span className="text-mute">{color}{soldOut(color) && ` · ${t.product.soldOut}`}</span>
           </legend>
           <div className="flex flex-wrap gap-3 p-1">
-            {colors.map((c) => (
-              <button
-                key={c}
-                type="button"
-                title={c}
-                aria-pressed={c === color}
-                onClick={() => { setColor(c); setShown(0) }}
-                className={cn("size-10 rounded-full ring-offset-2", c === color ? "ring-2 ring-ink" : "ring-1 ring-hairline")}
-                style={{ background: swatch(c) }}
-              >
-                <span className="sr-only">{c}</span>
-              </button>
-            ))}
+            {colors.map((c) => {
+              const out = soldOut(c) // still selectable: its photos stay viewable
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  title={out ? `${c} · ${t.product.soldOut}` : c}
+                  aria-pressed={c === color}
+                  onClick={() => { setColor(c); setShown(0) }}
+                  className={cn("relative size-10 rounded-full ring-offset-2", c === color ? "ring-2 ring-ink" : "ring-1 ring-hairline", out && "opacity-50")}
+                  style={{ background: swatch(c) }}
+                >
+                  {/* diagonal strike: ink with a white edge, visible on black and white swatches alike */}
+                  {out && <span className="absolute inset-0 m-auto h-0.5 w-11 -rotate-45 bg-ink shadow-[0_0_0_1px_var(--color-canvas)]" />}
+                  <span className="sr-only">{c}{out && ` · ${t.product.soldOut}`}</span>
+                </button>
+              )
+            })}
           </div>
         </fieldset>
 

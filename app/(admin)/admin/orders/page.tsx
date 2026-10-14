@@ -2,20 +2,21 @@ import Link from "next/link"
 import { OrderStatus, type Prisma } from "@prisma/client"
 import { Search } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Notice } from "@/components/admin/fields"
+import { Notice, Pager } from "@/components/admin/fields"
 import { FormSelect } from "@/components/form-select"
 import { WhatsAppIcon } from "@/components/whatsapp-icon"
 import { updateOrderStatus } from "@/lib/actions/admin"
 import { db } from "@/lib/db"
 import { formatDate, formatPrice, getI18n } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+import { cn, listParams, paginate } from "@/lib/utils"
 
 const STATUSES = Object.values(OrderStatus) // schema order: the COD flow
+const PER_PAGE = 10
 
 export default async function Orders({ searchParams }: PageProps<"/admin/orders">) {
   const sp = await searchParams
   const status = STATUSES.find((s) => s === sp.status)
-  const q = typeof sp.q === "string" ? sp.q.trim() : ""
+  const { q, page: asked } = listParams(sp)
   const digits = q.replace(/\D/g, "")
   // q matches the buyer's name, phone (spaces ignored) or the 8-char ref shown in the table
   const where: Prisma.OrderWhereInput = {
@@ -28,17 +29,23 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
       ],
     }),
   }
-  const [{ t, locale }, orders, counts] = await Promise.all([
+  const [{ t, locale }, total, counts] = await Promise.all([
     getI18n(),
-    db.order.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: { items: { include: { variant: { include: { product: true } } } } },
-    }),
+    db.order.count({ where }),
     db.order.groupBy({ by: ["status"], _count: true }),
   ])
+  const { page, pages, skip, take } = paginate(total, asked, PER_PAGE)
+  const orders = await db.order.findMany({
+    where, skip, take,
+    orderBy: { createdAt: "desc" },
+    include: { items: { include: { variant: { include: { product: true } } } } },
+  })
   const count = (s?: OrderStatus) => counts.reduce((n, c) => n + (!s || c.status === s ? c._count : 0), 0)
-  const tab = (s?: OrderStatus) => `/admin/orders${s || q ? `?${new URLSearchParams({ ...(s && { status: s }), ...(q && { q }) })}` : ""}`
+  // tabs and search go back to page 1; a status change returns to the current page
+  const tab = (s?: OrderStatus, n = 1) => {
+    const p = new URLSearchParams({ ...(s && { status: s }), ...(q && { q }), ...(n > 1 && { page: String(n) }) })
+    return `/admin/orders${p.size ? `?${p}` : ""}`
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -99,7 +106,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
               </TableCell>
               <TableCell className="font-medium">{formatPrice(o.totalAmount, locale)}</TableCell>
               <TableCell>
-                <form action={updateOrderStatus.bind(null, o.id, tab(status))}>
+                <form action={updateOrderStatus.bind(null, o.id, tab(status, page))}>
                   <FormSelect name="status" autoSubmit size="sm" defaultValue={o.status} aria-label={t.admin.status}
                     className={cn("w-40", o.status === "PENDING" && "font-medium", o.status === "CANCELLED" && "text-mute")}
                     items={STATUSES.map((s) => ({ value: s, label: t.status[s] }))} />
@@ -110,6 +117,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
         </TableBody>
       </Table>
       {!orders.length && <p className="text-mute">{t.admin.none}</p>}
+      <Pager t={t} page={page} pages={pages} href={(n) => tab(status, n)} />
     </div>
   )
 }

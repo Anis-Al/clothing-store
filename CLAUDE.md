@@ -571,6 +571,20 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   temp admin logs in after one wrong try. Both deleted. typecheck, lint, 8 tests clean.
   DB backed up first (`prisma/backups/store-2026-10-14-08-52.db`).
 
+### 2026-10-14 — UX review: orders pagination, sold-out colors
+- Request: "any UX improvement?" → list of 13 items (phone + desktop pass); user picked these two. The
+  rest went to Known gaps. Branch `ux-orders-pager-soldout-colors`.
+- **Admin Commandes paginated**: 10 per page (`PER_PAGE`), same `paginate`/`Pager` as Produits/Stock;
+  `q` and `page` read with `listParams`. Status tabs and search go back to page 1; the status select's
+  `back` URL carries the current page, so a status change keeps the admin on that page.
+- **PDP sold-out colors**: a color whose every size is at 0 gets a 50% swatch and a diagonal ink strike
+  with a white edge (shows on black and white swatches); title / sr-only text / legend add "· Épuisé".
+  Still clickable, so its photos stay viewable (sizes then all show struck through).
+- Verified (dev, pane): at `PER_PAGE = 2` with 4 orders → 2 pages, page 2 status change stays on
+  `?page=2`, `?page=99` → 2 / 2; order status put back. Bleu ciel (Oxford) and Noir (lin) zeroed → strike
+  visible on both, selected → "Noir · Épuisé"; Arabic title "· نفد المخزون". Stock restored from the saved
+  values. typecheck, lint, 8 tests clean. DB backed up first (`prisma/backups/store-2026-10-14-10-10.db`).
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - `docker build` never run yet (Docker Desktop not initialized on the dev machine). The first build may need fixes.
@@ -599,7 +613,11 @@ Keep this section last; update it when something here gets done or newly found.
   `/admin/categories` URL is a 404.
 - WhatsApp button only on product pages (admin orders have a per-customer WhatsApp link).
 - Admin on phones: orders table scrolls sideways (6 columns); inventory saves one row per click and reload.
-- No pagination on admin Commandes (grows fastest) or on the storefront catalog; reuse `paginate`/`Pager`.
-- PDP: sold-out colors look like the others; switching color keeps a size that may not exist there
-  (greyed "Ajouter au panier", no reason); a single-image product still shows a 1-thumbnail rail;
-  add-to-cart toast timer isn't reset on a second add. Cart qty buttons are labelled "-"/"+".
+- No pagination on the storefront catalog; reuse `paginate`/`Pager`.
+- PDP: switching color keeps a size that may not exist there (greyed "Ajouter au panier", no reason);
+  a single-image product still shows a 1-thumbnail rail; add-to-cart toast timer isn't reset on a second
+  add. Cart qty buttons are labelled "-"/"+".
+- From the 2026-10-14 UX review, not done: phones — PDP add-to-cart below the fold (967px on an 812px
+  screen; a sticky price + button bar would fix it), sticky header takes 132px (16%), header search
+  placeholder cut to "Recherc"; product cards show the lowest variant price with no "Dès" when prices
+  differ; `/merci` and the footer offer no contact (WhatsApp with the order ref); no swipe on PDP images.
