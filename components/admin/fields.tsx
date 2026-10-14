@@ -126,7 +126,7 @@ export function ListFilters({ t, path, cur, categories, placeholder }: {
           {keep("stock", "sort", "q")}
           <FormSelect name="category" size="sm" autoSubmit defaultValue={cur.category} placeholder={t.admin.allCategories}
             aria-label={t.admin.category} className="w-52 max-md:w-full"
-            items={[{ value: "", label: t.admin.allCategories }, ...categoryOptions(categories)]} />
+            items={[{ value: "", label: t.admin.allCategories }, ...categoryOptions(categories, false, undefined, t.catalog.all)]} />
         </form>
       </div>
     </div>

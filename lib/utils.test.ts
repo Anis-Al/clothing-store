@@ -33,12 +33,14 @@ test("category options: main then its subs", () => {
     { id: "h", name: "Hauts", parentId: null }, { id: "p", name: "Pantalons", parentId: "b" },
   ])
   assert.deepEqual(opts.map((o) => o.label), ["Bas", "Bas › Pantalons", "Hauts", "Hauts › Chemises"])
+  assert.deepEqual(opts.map((o) => [o.group, o.option]), [["Bas", "Bas"], ["Bas", "Pantalons"], ["Hauts", "Hauts"], ["Hauts", "Chemises"]])
   const leaves = (keep?: string) => categoryOptions([
     { id: "c", name: "Chemises", parentId: "h" }, { id: "b", name: "Bas", parentId: null },
-    { id: "h", name: "Hauts", parentId: null }, { id: "a", name: "Accessoires", parentId: null },
+    { id: "h", name: "Hauts", parentId: null }, { id: "z", name: "Zips", parentId: null },
   ], true, keep).map((o) => o.label)
-  assert.deepEqual(leaves(), ["Accessoires", "Bas", "Hauts › Chemises"]) // group "Hauts" hidden, childless mains kept
-  assert.deepEqual(leaves("h"), ["Accessoires", "Bas", "Hauts", "Hauts › Chemises"])
+  // group "Hauts" hidden; childless mains kept, before the groups
+  assert.deepEqual(leaves(), ["Bas", "Zips", "Hauts › Chemises"])
+  assert.deepEqual(leaves("h"), ["Bas", "Zips", "Hauts", "Hauts › Chemises"])
 })
 
 test("CSV import: parse, decode, plan", async () => {

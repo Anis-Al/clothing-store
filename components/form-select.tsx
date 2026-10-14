@@ -1,8 +1,10 @@
 "use client"
 import { useRef, useState } from "react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-type Item = { value: string; label: React.ReactNode }
+// `label` shows in the trigger; `option` (default `label`) in the list. Consecutive items with the
+// same `group` sit under one heading.
+type Item = { value: string; label: React.ReactNode; option?: React.ReactNode; group?: string }
 
 // shadcn Select for plain <form>s: Base UI renders a hidden input named `name`, so server actions and
 // FormData read it like a native <select>. `autoSubmit` submits the surrounding form on change;
@@ -26,6 +28,13 @@ export function FormSelect({
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [resets, setResets] = useState(0)
+  const runs: { group?: string; items: Item[] }[] = []
+  for (const i of items) {
+    const last = runs.at(-1)
+    if (i.group && last?.group === i.group) last.items.push(i)
+    else runs.push({ group: i.group, items: [i] })
+  }
+  const item = (i: Item) => <SelectItem key={i.value} value={i.value}>{i.option ?? i.label}</SelectItem>
   return (
     <Select
       // remount when the server sends a new default (e.g. after a status save) — Base UI warns otherwise
@@ -48,9 +57,13 @@ export function FormSelect({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent alignItemWithTrigger={false}>
-        {items.map((i) => (
-          <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>
-        ))}
+        {runs.flatMap((r) => r.group ? [
+          <SelectGroup key={`group:${r.group}`} className="p-0">
+            {/* sticky: the heading stays on top while its group scrolls under it (-top-1.5 = the popup's padding) */}
+            <SelectLabel className="sticky -top-1.5 z-10 bg-canvas px-3 pt-3 pb-1 text-xs font-medium text-mute uppercase">{r.group}</SelectLabel>
+            {r.items.map(item)}
+          </SelectGroup>,
+        ] : r.items.map(item))}
       </SelectContent>
     </Select>
   )

@@ -39,13 +39,17 @@ export const unique = <T,>(xs: T[]) => [...new Set(xs)]
 // Admin selects: main categories by name, each followed by its sub-categories as "Main › Sub".
 // `leaves` (product form): a main category with sub-categories is a group, not a place for products.
 // `keep` = the product's current category, listed anyway so the select never shows a raw id.
-export function categoryOptions(cats: { id: string; name: string; parentId: string | null }[], leaves = false, keep?: string) {
+export function categoryOptions(cats: { id: string; name: string; parentId: string | null }[], leaves = false, keep?: string, all?: string) {
   const byName = [...cats].sort((a, b) => a.name.localeCompare(b.name))
-  return byName.filter((c) => !c.parentId).flatMap((main) => {
-    const subs = byName.filter((s) => s.parentId === main.id)
+  const mains = byName.filter((c) => !c.parentId).map((main) => ({ main, subs: byName.filter((s) => s.parentId === main.id) }))
+  // childless main categories first: listed after a group, they would read as part of it
+  return [...mains.filter((m) => !m.subs.length), ...mains.filter((m) => m.subs.length)].flatMap(({ main, subs }): { value: string; label: string; group?: string; option?: string }[] => {
+    if (!subs.length) return [{ value: main.id, label: main.name }]
+    // `label` = the trigger's text, `option` = the row's text under the `group` heading
+    const group = main.name
     return [
-      ...(!leaves || !subs.length || main.id === keep ? [{ value: main.id, label: main.name }] : []),
-      ...subs.map((s) => ({ value: s.id, label: `${main.name} › ${s.name}` })),
+      ...(!leaves || main.id === keep ? [{ value: main.id, label: main.name, group, option: all ?? main.name }] : []),
+      ...subs.map((s) => ({ value: s.id, label: `${main.name} › ${s.name}`, group, option: s.name })),
     ]
   })
 }

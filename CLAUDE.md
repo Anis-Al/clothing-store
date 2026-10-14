@@ -79,7 +79,9 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   existed at build time.
 - **Dropdowns**: never a native `<select>`. Use `FormSelect` (`components/form-select.tsx`, shadcn Select
   on Base UI): posts its value through a hidden input named `name`; supports `required`, `placeholder`,
-  `autoSubmit` (submits the surrounding form on change), `size="sm"`.
+  `autoSubmit` (submits the surrounding form on change), `size="sm"`. Items may carry `group` (consecutive
+  items with the same one go under a sticky heading) and `option` (row text; `label` stays the trigger's text).
+  The popup is at most 20rem tall and scrolls.
 - **Product URLs**: slug generated from the name at creation (`freeSlug`, `-2`… if taken), never
   typed and never changed on rename. Variant code `sku` is labelled "Référence" in the UI.
 - **Variant** (one color × size row) is "Variante(s)" in FR and "متغيّر / المتغيرات" in AR. Never
@@ -758,8 +760,33 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - Commits this session: `6c90e70` (phone filters), `b88b96d` (RETURNED, notes, sorting, date filter, desktop
   tabs), then "Communes at checkout, wider cart form, copy trims" (communes, cart layout, import copy, phone hint).
 
+### 2026-10-14 — SEO: robots.txt
+- SEO audit (fetched as Googlebot): server-rendered pages, real links, stable slugs, per-product title +
+  description, `lang`/`dir`, image `alt`, admin/login/merci noindex: fine. Missing items went to Known gaps.
+- `app/robots.txt` (static, no code): `Disallow: /cart` only. `/admin`, `/login`, `/merci` deliberately not
+  listed (robots.txt is public; they are unlinked and already noindex). No `Sitemap:` line until a site URL exists.
+- Verified: `/robots.txt` 200 `text/plain` on dev.
+
+### 2026-10-14 — Category dropdowns grouped
+- Request: group the category dropdowns (Produits / Stock filters, product form), then "too long with a lot
+  of content". `categoryOptions` items get `group` (main category name) and `option` (short row text):
+  under a "HAUTS" heading the rows read "Tout" (filters only: the whole group), "Chemises"…; the trigger
+  still says "Hauts › Chemises". Childless main categories come first (after a group they'd read as part of it).
+  `FormSelect` wraps consecutive same-`group` items in `SelectGroup` + `SelectLabel` (labelled group for screen
+  readers); headings are sticky (`-top-1.5` = the popup's padding). Popup capped at 20rem for every select
+  (`components/ui/select.tsx`), which also shortens the cart's commune list.
+- Verified (dev, AR): filter popup 320px for 1180px of content, "Hauts" heading pinned at 0 while its rows
+  scroll; picking Chemises → 2 products, trigger "Hauts › Chemises"; product form groups without "Tout".
+  typecheck, lint, 7 tests clean.
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
+- **SEO, still missing** (simplest first): `metadataBase` from a new `SITE_URL` env var (needed by the rest);
+  `app/sitemap.ts` (home, catalog, categories, products) + `Sitemap:` line in `app/robots.txt`; Open Graph image +
+  price on product pages (WhatsApp/Facebook previews show nothing today); Product JSON-LD (price DZD, stock);
+  category pages titled "Tous les produits" with the home description, no canonical, so every size/color/sort/q
+  combo is a duplicate URL; default favicon. Arabic is invisible to search engines (locale is a cookie on the
+  same URL): only `/ar/...` routes + `hreflang` would fix it.
 - **TODO (planned) — Working with Yalidine (delivery company).** Not decided how deep; options below.
   **Step 0 — done 2026-10-14:** checkout = wilaya + **commune** (select, `lib/communes.ts`) + street address.
   Still to check against Yalidine's own list: our wilaya spellings (e.g. "El M'Ghair", "Bordj Bou Arréridj") and
