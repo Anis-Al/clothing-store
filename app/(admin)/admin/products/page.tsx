@@ -34,7 +34,10 @@ export default async function AdminProducts({ searchParams }: PageProps<"/admin/
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-[32px] font-medium">{t.admin.products} <span className="text-mute tabular-nums">({total})</span></h1>
-        <Link href="/admin/products/new" className={buttonVariants()}>{t.admin.newProduct}</Link>
+        <div className="flex gap-2">
+          <Link href="/admin/products/import" className={buttonVariants({ variant: "secondary" })}>{t.admin.import}</Link>
+          <Link href="/admin/products/new" className={buttonVariants()}>{t.admin.newProduct}</Link>
+        </div>
       </div>
       <ListFilters t={t} path={PATH} cur={cur} categories={categories} placeholder={t.admin.searchProducts} />
       <Table>

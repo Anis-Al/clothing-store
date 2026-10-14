@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { requireAdmin } from "@/auth"
 import { db } from "@/lib/db"
-import { getSettings } from "@/lib/i18n"
+import { decodeText, parseCsv, planImport, type ImportState } from "@/lib/csv"
+import { fill, getI18n, getSettings } from "@/lib/i18n"
 import { MIME, UPLOAD_DIR } from "@/lib/uploads"
 import { makeSku, slugify, stockDirection, unique } from "@/lib/utils"
 
@@ -107,6 +108,50 @@ export async function deleteProduct(id: string) {
   await Promise.all(images.map(removeFile))
   done()
   redirect("/admin/products")
+}
+
+// CSV import (useActionState): every row is checked first, then everything is written in one transaction,
+// so a file with errors changes nothing. Rules in lib/csv planImport.
+export async function importProducts(_: ImportState, f: FormData): Promise<ImportState> {
+  await requireAdmin()
+  const { t } = await getI18n()
+  const file = f.get("file")
+  // ponytail: 1 MB ≈ 10k rows, one query per row in the transaction; batch the writes if imports get bigger
+  if (!(file instanceof File) || !/\.csv$/i.test(file.name) || !file.size || file.size > 1024 * 1024) return { errors: [t.admin.importBadFile] }
+  const [cats, products] = await Promise.all([
+    db.category.findMany(),
+    db.product.findMany({ select: { id: true, name: true, slug: true, variants: { select: { id: true, color: true, size: true } } } }),
+  ])
+  const { errors, plan } = planImport(parseCsv(decodeText(new Uint8Array(await file.arrayBuffer()))), t, cats, products)
+  if (errors.length) return { errors: errors.length > 20 ? [...errors.slice(0, 20), fill(t.admin.importMore, { n: errors.length - 20 })] : errors }
+  let created = 0, added = 0, updated = 0
+  try {
+    await db.$transaction(async (tx) => {
+      for (const p of plan) {
+        let { id, slug } = p
+        if (!id || !slug) {
+          slug = await freeSlug(p.name, "produit", (s) => tx.product.findUnique({ where: { slug: s }, select: { id: true } }))
+          ;({ id } = await tx.product.create({ data: { name: p.name, slug, description: p.description, categoryId: p.categoryId } }))
+          created++
+        }
+        for (const v of p.variants) {
+          const data = { price: v.price, stockCount: v.stockCount }
+          if (v.id) {
+            await tx.productVariant.update({ where: { id: v.id }, data })
+            updated++
+          } else {
+            await tx.productVariant.create({ data: { ...data, productId: id, color: v.color, size: v.size, sku: makeSku(slug, v.color, v.size) } })
+            added++
+          }
+        }
+      }
+    }, { timeout: 60_000 })
+  } catch (e) {
+    if (isUnique(e)) return { errors: [t.admin.duplicate] } // two colors with the same Référence ("Bleu ciel" / "bleu-ciel")
+    throw e
+  }
+  done()
+  return { done: fill(t.admin.importDone, { created, added, updated }) }
 }
 
 const CATS = "/admin/settings/categories"

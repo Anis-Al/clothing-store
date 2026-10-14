@@ -525,6 +525,25 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   Only `lib/dict.ts` strings changed (section titles, column, stat tile, add button, matrix hint,
   duplicate error, low-stock hint); code and DB keep `variant`.
 
+### 2026-10-11 — Product import (CSV)
+- `/admin/products/import` ("Importer" next to "Nouveau produit"): one CSV row per variant, columns named
+  with the admin labels in FR or AR (`Nom;Catégorie;Description;Couleur;Taille;Prix (DA);Stock`, matched on
+  the header's first word). Rows with the same name (any case) = one product; category + description from
+  its first row. Category = existing name or `Main › Sub`, must not be a group. Existing product (same name):
+  variants matched by color × size (any case) get the file's price and stock, new ones are added; the
+  product's own fields are untouched. Images: on the product page afterwards.
+- `lib/csv.ts` (pure, tested): `decodeText` (UTF-8, else windows-1252 = plain Excel "CSV"), `parseCsv`
+  (quotes, `""`, line breaks in cells, separator `;`/`,`/tab detected on line 1), `planImport` (all checks,
+  errors as "Ligne n : …" = Excel row numbers). `importProducts` (useActionState, `ImportForm` in
+  `components/admin/client.tsx`) writes nothing if any row fails, else one transaction. `.csv` only, ≤ 1 MB.
+- Template = `data:` link built on the page (BOM + `;`, headers in the admin's language, example in the first
+  leaf category).
+- Verified (dev): error file → 2 line errors, nothing written; windows-1252 file with `1 500,00` and a quoted
+  `;` → product + 2 variants; re-import in lower case → 1 updated (spelling kept) + 1 added; Arabic page and
+  template headers. Test product deleted. DB backed up first (`prisma/backups/store-2026-10-11-15-32.db`).
+- Gotcha again: the running dev server kept serving `ImportForm` as undefined (new export of an existing
+  client module) until the file was touched again; no code change needed.
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - `docker build` never run yet (Docker Desktop not initialized on the dev machine). The first build may need fixes.
@@ -543,6 +562,8 @@ Keep this section last; update it when something here gets done or newly found.
   hides it).
 - Store name is one value for both languages (FR/AR for tagline, hero title, delivery text only).
 - Product images: no main-image choice or ordering. No order detail page in admin.
+- Import: CSV only (`.xlsx` would need a dependency such as `read-excel-file`); no catalog export to edit
+  and re-import; it can't rename products, change their category/description or delete variants.
 - Product content is single-language (no `nameAr`); add columns if the catalog must be bilingual.
 - Admin password can only be changed with `npm run admin:set` (no UI; not picked for Réglages).
 - Réglages: switching tabs drops unsaved edits without a warning (each tab is its own form).

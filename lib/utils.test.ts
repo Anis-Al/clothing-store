@@ -48,6 +48,43 @@ test("category options: main then its subs", () => {
   assert.deepEqual(leaves("h"), ["Accessoires", "Bas", "Hauts", "Hauts › Chemises"])
 })
 
+test("CSV import: parse, decode, plan", async () => {
+  const { decodeText, parseCsv, planImport, toCsv } = await import("./csv")
+  const { DICTS } = await import("./dict")
+  const rows = [["Nom", "Desc"], ["a;b", 'il dit "oui"\nligne 2'], ["", ""]]
+  assert.deepEqual(parseCsv("﻿" + toCsv(rows)), rows)
+  assert.deepEqual(parseCsv("a,b\r\n1,2"), [["a", "b"], ["1", "2"]])
+  assert.equal(decodeText(new Uint8Array([0x63, 0x61, 0x66, 0xe9])), "café") // windows-1252 from plain Excel CSV
+  assert.equal(decodeText(new TextEncoder().encode("﻿قميص")), "قميص")
+
+  const cats = [
+    { id: "h", name: "Hauts", slug: "hauts", parentId: null }, { id: "c", name: "Chemises", slug: "chemises", parentId: "h" },
+    { id: "a", name: "Accessoires", slug: "accessoires", parentId: null },
+  ]
+  const products = [
+    { id: "p1", name: "Chemise Oxford", slug: "chemise-oxford", variants: [{ id: "v1", color: "Blanc", size: "M" }] },
+    { id: "p2", name: "Polo", slug: "polo", variants: [] }, { id: "p3", name: "polo", slug: "polo-2", variants: [] },
+  ]
+  const plan = (csv: string) => planImport(parseCsv(csv), DICTS.fr, cats, products)
+  // Arabic headers, "Main › Sub" category, existing product matched in any case, price "1 500,00"
+  const ok = plan("الاسم;الفئة;اللون;المقاس;السعر (دج);المخزون\nchemise oxford;Hauts › Chemises;blanc;m;1 500,00;4\nChemise Oxford;Chemises;Blanc;L;1500;2\nCeinture;accessoires;Noir;Unique;900 DA;0")
+  assert.deepEqual(ok.errors, [])
+  assert.deepEqual(ok.plan.map((p) => [p.id, p.name, p.variants.map((v) => [v.id, v.size, v.price, v.stockCount])]), [
+    ["p1", "chemise oxford", [["v1", "m", 1500, 4], [undefined, "L", 1500, 2]]],
+    [undefined, "Ceinture", [[undefined, "Unique", 900, 0]]],
+  ])
+  assert.deepEqual(plan("Nom;Couleur\nx;y").errors, ["Colonnes manquantes : Catégorie, Taille, Prix (DA), Stock."])
+  const bad = plan("Nom;Catégorie;Couleur;Taille;Prix;Stock\nA;Hauts;Noir;M;1;1\nB;Chemises;Noir;M;1.000;1\nC;Robes;Noir;M;1;1\nPolo;Chemises;Noir;M;1;1\nD;Chemises;Noir;M;1;1\nD;Chemises;noir;m;1;1")
+  assert.deepEqual(bad.errors, [
+    "Ligne 2 : « Hauts » a des sous-catégories : indiquez la sous-catégorie",
+    "Ligne 3 : « Prix (DA) » manquant ou invalide",
+    "Ligne 4 : catégorie « Robes » introuvable",
+    "Ligne 5 : plusieurs produits s'appellent « Polo »",
+    "Ligne 7 : variante noir / m en double",
+  ])
+  assert.deepEqual(plan("Nom;Catégorie;Couleur;Taille;Prix;Stock\n;;;;;").errors, ["Le fichier ne contient aucune ligne de produit."])
+})
+
 test("DZ phone + wilaya validation", async () => {
   const { normalizePhone, isWilaya, WILAYAS } = await import("./wilayas")
   assert.equal(normalizePhone("0555 12 34 56"), "0555123456")
