@@ -779,6 +779,14 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   scroll; picking Chemises → 2 products, trigger "Hauts › Chemises"; product form groups without "Tout".
   typecheck, lint, 7 tests clean.
 
+### 2026-10-21 — Checkout rate limit, group-category check, Docker TZ
+- `checkout`: in-memory per-IP limit (10 attempts / 10 min, failed ones count; IP from `x-forwarded-for`, so
+  Caddy must set it), `t.errors.tooMany`. A restart clears it. Not browser-tested.
+- `createProduct` refuses a main category that has sub-categories (`?error=catGroup`); `updateProduct` refuses
+  moving onto one but lets a product already on a group keep it.
+- Dockerfile: `TZ=Africa/Algiers` (dashboard day buckets, date filter). Docker build still not run.
+- typecheck, lint, 7 tests clean.
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - **SEO, still missing** (simplest first): `metadataBase` from a new `SITE_URL` env var (needed by the rest);
@@ -814,19 +822,16 @@ Keep this section last; update it when something here gets done or newly found.
   References: github.com/tarek-berkane/yalidine (Python), github.com/feeefapp/yalidine (TS, `npm i yalidine`);
   plain `fetch` is enough, no dependency needed.
 - `docker build` never run yet (Docker Desktop not initialized on the dev machine). The first build may need fixes.
-- Dashboard day buckets and the Commandes date filter follow the server's time zone; the Docker image runs in UTC, so set
-  `TZ=Africa/Algiers` there (untested) or orders placed between midnight and 1 am land on the day
-  before. No "delivered on" date exists, so there is no revenue-over-time chart (only order value by
+- Dashboard day buckets and the Commandes date filter follow the server's time zone (Dockerfile sets
+  `TZ=Africa/Algiers`, untested). No "delivered on" date exists, so there is no revenue-over-time chart (only order value by
   order date).
-- No rate limit on guest checkout: fake COD orders hold stock until the admin cancels them.
+- Guest checkout limit is per IP, in memory: fake COD orders from many IPs still hold stock until cancelled.
 - Categories: no manual order (alphabetical), no category images (home tiles use the latest product's).
   On touch tablets (≥768px) the hover menu doesn't open: tapping a main category opens its page, whose
   sub-row lists the sub-categories.
 - Delivery fee is one flat amount (Réglages): no per-wilaya fee or stop-desk option (see the Yalidine TODO
   above). Admin orders show the total only, not the fee part. Orders placed before communes have `commune = ""`
   (their commune is inside `address`). The commune select is a plain list with type-ahead (Tizi Ouzou: 67), no search box.
-- `createProduct`/`updateProduct` don't refuse a main category that has sub-categories (only the form
-  hides it).
 - Store name is one value for both languages (FR/AR for tagline, hero title, delivery text only).
 - Product images: no main-image choice or ordering. No order detail page in admin.
 - Import: CSV only (`.xlsx` would need a dependency such as `read-excel-file`); no catalog export to edit

@@ -14,6 +14,7 @@ RUN npx prisma generate && npm run build \
 ENV NODE_ENV=production \
     DATABASE_URL=file:/app/prisma/store.db \
     AUTH_TRUST_HOST=true \
+    TZ=Africa/Algiers \
     PORT=3000
 
 VOLUME ["/app/prisma", "/app/public/uploads"]

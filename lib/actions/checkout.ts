@@ -1,4 +1,5 @@
 "use server"
+import { headers } from "next/headers"
 import { db } from "@/lib/db"
 import { fill, getI18n, getSettings } from "@/lib/i18n"
 import { isCommune, normalizePhone } from "@/lib/wilayas"
@@ -16,8 +17,24 @@ class PriceError extends Error {
 // cart showed (`price`, `fee`) are only compared, so the customer never orders at a total they didn't see.
 export type Shipping = { fullName: string; phone: string; wilaya: string; commune: string; address: string }
 
+// ponytail: in-memory per-IP limit (10 attempts / 10 min, failed ones count), reset by a restart; per-IP rules in Caddy if it must survive
+const recent = new Map<string, number[]>()
+const LIMIT = 10
+const WINDOW = 10 * 60_000
+
+function tooMany(ip: string) {
+  const now = Date.now()
+  const hits = (recent.get(ip) ?? []).filter((t) => now - t < WINDOW)
+  if (hits.length >= LIMIT) return true
+  recent.set(ip, [...hits, now])
+  if (recent.size > 5000) for (const [k, v] of recent) if (now - v[v.length - 1] >= WINDOW) recent.delete(k)
+  return false
+}
+
 export async function checkout(lines: { variantId: string; qty: number; price: number }[], fee: number, shipping: Shipping) {
   const { t } = await getI18n()
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0].trim() || "unknown"
+  if (tooMany(ip)) return { error: t.errors.tooMany }
 
   const qty = new Map<string, number>()
   const shown = new Map<string, number>()

@@ -46,6 +46,7 @@ const fr = {
   errors: {
     stock: "Stock insuffisant pour « {item} ».", generic: "Une erreur est survenue.",
     priceChanged: "Les prix ou les frais de livraison ont changé. Vérifiez le nouveau total puis commandez à nouveau.",
+    tooMany: "Trop de commandes depuis cette connexion. Réessayez dans quelques minutes ou contactez-nous.",
   },
   admin: {
     dashboard: "Tableau de bord", products: "Produits", inventory: "Stock", orders: "Commandes",
@@ -76,6 +77,7 @@ const fr = {
     parentCategory: "Catégorie parente", topLevel: "— Catégorie principale", chooseCategory: "Choisir une catégorie",
     catDepth: "Deux niveaux maximum : la parente doit être une catégorie principale, et une catégorie qui a des sous-catégories reste principale.",
     catHasChildren: "Impossible : elle contient des sous-catégories. Déplacez-les ou supprimez-les d'abord.",
+    catGroup: "Choisissez une sous-catégorie : cette catégorie est un groupe.",
     settings: "Réglages", settingsHint: "Un champ de texte laissé vide reprend le texte par défaut, affiché en gris.",
     sStore: "Boutique", storeName: "Nom de la boutique", tagline: "Slogan",
     whatsapp: "Numéro WhatsApp",
@@ -157,6 +159,7 @@ const ar: Dict = {
   errors: {
     stock: "المخزون غير كافٍ لـ «{item}».", generic: "حدث خطأ ما.",
     priceChanged: "تغيّرت الأسعار أو رسوم التوصيل. راجع المجموع الجديد ثم أعد تأكيد الطلب.",
+    tooMany: "طلبات كثيرة من هذا الاتصال. أعد المحاولة بعد دقائق أو تواصل معنا.",
   },
   admin: {
     dashboard: "لوحة التحكم", products: "المنتجات", inventory: "المخزون", orders: "الطلبات",
@@ -185,6 +188,7 @@ const ar: Dict = {
     parentCategory: "الفئة الأم", topLevel: "— فئة رئيسية", chooseCategory: "اختر فئة",
     catDepth: "مستويان كحد أقصى: يجب أن تكون الفئة الأم فئة رئيسية، والفئة التي لها فئات فرعية تبقى رئيسية.",
     catHasChildren: "غير ممكن: تحتوي على فئات فرعية. انقلها أو احذفها أولاً.",
+    catGroup: "اختر فئة فرعية: هذه الفئة مجموعة.",
     settings: "الإعدادات", settingsHint: "حقل النص الفارغ يستعمل النص الافتراضي المعروض باللون الرمادي.",
     sStore: "المتجر", storeName: "اسم المتجر", tagline: "الشعار",
     whatsapp: "رقم واتساب",

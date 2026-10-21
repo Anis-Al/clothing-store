@@ -37,10 +37,14 @@ async function freeSlug(name: string, fallback: string, taken: (slug: string) =>
   }
 }
 
+// A main category with sub-categories is a group: products go in its children.
+const isGroup = async (id: string) => (await db.category.count({ where: { parentId: id } })) > 0
+
 export async function createProduct(f: FormData) {
   await requireAdmin()
   const name = str(f, "name")
   if (!name || !str(f, "categoryId") || !matrix("x", f).length) redirect("/admin/products/new?error=required")
+  if (await isGroup(str(f, "categoryId"))) redirect("/admin/products/new?error=catGroup")
   const slug = await freeSlug(name, "produit", (slug) => db.product.findUnique({ where: { slug }, select: { id: true } }))
   const variants = matrix(slug, f)
   let id: string
@@ -62,6 +66,9 @@ export async function updateProduct(id: string, f: FormData) {
   await requireAdmin()
   const name = str(f, "name")
   if (!name) redirect(`/admin/products/${id}?error=required`)
+  // a product already sitting on a group keeps it (the form lists it); moving onto one is refused
+  const cur = await db.product.findUnique({ where: { id }, select: { categoryId: true } })
+  if (str(f, "categoryId") !== cur?.categoryId && (await isGroup(str(f, "categoryId")))) redirect(`/admin/products/${id}?error=catGroup`)
   const variants = await db.productVariant.findMany({ where: { productId: id }, select: { id: true } })
   try {
     await db.$transaction([
