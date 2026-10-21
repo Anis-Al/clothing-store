@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { SlidersHorizontal } from "lucide-react"
+import { ChevronDown, SlidersHorizontal } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import { ProductGrid } from "@/components/store/product-card"
 import { getFacets, getProducts, type Filters } from "@/lib/catalog"
@@ -27,6 +27,8 @@ export default async function Catalog({ searchParams }: PageProps<"/products">) 
   const to = (k: keyof Filters, v: string) => `/products?${new URLSearchParams({ ...f, [k]: v } as Record<string, string>)}`
   const chip = (active: boolean) =>
     cn("inline-flex h-10 shrink-0 items-center rounded-full border px-4 text-sm font-medium", active ? "border-ink bg-ink text-canvas" : "border-hairline hover:border-ink")
+  const row = (active: boolean, sub = false) =>
+    cn("flex min-h-10 items-center justify-between gap-2 text-sm", active ? "font-medium text-ink" : "text-mute hover:text-ink", sub && "min-h-9")
   // ?category= is a main category or one of its sub-categories; `group` is the main one either way.
   const group = facets.categories.find((c) => c.slug === f.category || c.children.some((s) => s.slug === f.category))
   const exact = group?.slug === f.category ? group : group?.children.find((s) => s.slug === f.category)
@@ -35,21 +37,30 @@ export default async function Catalog({ searchParams }: PageProps<"/products">) 
 
   const filters = (
     <>
-      <FilterGroup label={t.catalog.category}>
-        <Link href={href("category")} className={chip(!f.category)}>{t.catalog.all}</Link>
-        {facets.categories.map((c) => (
-          <Link key={c.id} href={exact === c ? href("category") : to("category", c.slug)} className={chip(group === c)}>{c.name}</Link>
-        ))}
-        {/* sub-categories of the selected group; clicking the active one goes back up to the group */}
-        {group && group.children.length > 0 && (
-          <div className="flex basis-full flex-wrap gap-2 border-s-2 border-hairline ps-3">
-            <Link href={to("category", group.slug)} className={cn(chip(exact === group), "h-8")}>{t.catalog.all}</Link>
-            {group.children.map((s) => (
-              <Link key={s.id} href={to("category", exact === s ? group.slug : s.slug)} className={cn(chip(exact === s), "h-8")}>{s.name}</Link>
-            ))}
-          </div>
-        )}
-      </FilterGroup>
+      {/* vertical list (long names like "Chaussures & accessoires" don't fit pills in 220px);
+          the selected group opens its sub-categories right under it */}
+      <div className="flex flex-col gap-3 border-t border-hairline pt-4">
+        <p className="font-medium">{t.catalog.category}</p>
+        <ul className="flex flex-col">
+          <li><Link href={href("category")} className={row(!f.category)}>{t.catalog.all}</Link></li>
+          {facets.categories.map((c) => (
+            <li key={c.id}>
+              <Link href={exact === c ? href("category") : to("category", c.slug)} aria-current={group === c || undefined} className={row(group === c)}>
+                {c.name}
+                {c.children.length > 0 && <ChevronDown className={cn("size-4 text-mute transition-transform", group === c && "rotate-180")} />}
+              </Link>
+              {group === c && c.children.length > 0 && (
+                <ul className="mb-2 ms-1 flex flex-col border-s-2 border-hairline ps-3">
+                  <li><Link href={to("category", c.slug)} className={row(exact === c, true)}>{t.catalog.all}</Link></li>
+                  {c.children.map((s) => (
+                    <li key={s.id}><Link href={to("category", exact === s ? c.slug : s.slug)} className={row(exact === s, true)}>{s.name}</Link></li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
       <FilterGroup label={t.catalog.size}>
         {sortSizes(facets.sizes).map((s) => (
           <Link key={s} href={href("size", s)} className={cn(chip(f.size === s), "min-w-12 justify-center")}>{s}</Link>
