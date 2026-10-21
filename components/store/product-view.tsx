@@ -145,9 +145,12 @@ export function ProductView(props: {
         </fieldset>
 
         {/* PRD: disabled when the selected variant has stockCount === 0 */}
-        <Button className="mt-8 w-full" disabled={!canAdd} onClick={onAdd}>
-          {selected?.stockCount === 0 ? t.product.soldOut : size ? t.product.addToCart : t.product.chooseSize}
-        </Button>
+        {/* phones: pinned to the bottom of the screen while the details scroll past */}
+        <div className="sticky bottom-0 z-10 -mx-4 mt-8 border-t border-hairline bg-canvas px-4 py-3 md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
+          <Button className="w-full" disabled={!canAdd} onClick={onAdd}>
+            {selected?.stockCount === 0 ? t.product.soldOut : size ? t.product.addToCart : t.product.chooseSize}
+          </Button>
+        </div>
         {props.whatsapp && (
           <a
             href={`https://wa.me/${props.whatsapp}?text=${encodeURIComponent(
