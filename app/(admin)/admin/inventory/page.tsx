@@ -11,10 +11,10 @@ import { formatPrice, getI18n, getSettings } from "@/lib/i18n"
 import { cn, listHref, listParams, paginate } from "@/lib/utils"
 
 const PATH = "/admin/inventory"
-const PER_PAGE = 7
+const PER_PAGE = 8 // rows fit a 1280×800 screen with the filters
 // ponytail: phones told apart by the browser's own hint (Sec-CH-UA-Mobile, Chromium) or "Mobi" in the user agent
 // (Safari, Firefox; the usual MDN rule). A wrong guess only changes the page size.
-const PER_PAGE_PHONE = 4
+const PER_PAGE_PHONE = 3
 
 export default async function Inventory({ searchParams }: PageProps<"/admin/inventory">) {
   const cur = listParams(await searchParams)

@@ -17,14 +17,24 @@ export default async function ImportProducts() {
     ["Produit exemple", leaf?.name ?? "", "", "Noir", "L", 2500, 8],
   ])
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
-      <h1 className="text-[32px] font-medium">{t.admin.importTitle}</h1>
-      <ul className="flex list-disc flex-col gap-2 ps-5 text-sm">{t.admin.importRules.map((r) => <li key={r}>{r}</li>)}</ul>
-      <a href={`data:text/csv;charset=utf-8,${encodeURIComponent(`﻿${csv}`)}`} download="modele-produits.csv"
-        className={buttonVariants({ variant: "secondary", className: "w-fit" })}>
-        {t.admin.importTemplate}
-      </a>
-      <div className="border-t border-hairline pt-6"><ImportForm /></div>
+    <div className="flex max-w-3xl flex-col gap-4">
+      <h1 className="text-[28px] font-medium">{t.admin.importTitle}</h1>
+      {/* two steps side by side: get the template, send it back filled; one line of rules under them */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <section className="flex flex-col gap-3 rounded-2xl bg-cloud p-5">
+          <h2 className="font-medium">{t.admin.importStep1}</h2>
+          <p className="text-sm text-mute">{t.admin.importStep1Text}</p>
+          <a href={`data:text/csv;charset=utf-8,${encodeURIComponent(`﻿${csv}`)}`} download="modele-produits.csv"
+            className={buttonVariants({ variant: "secondary", size: "sm", className: "mt-auto w-fit bg-canvas" })}>
+            {t.admin.importTemplate}
+          </a>
+        </section>
+        <section className="flex flex-col gap-3 rounded-2xl border border-hairline-soft p-5">
+          <h2 className="font-medium">{t.admin.importStep2}</h2>
+          <ImportForm />
+        </section>
+      </div>
+      <p className="text-sm text-mute">{t.admin.importNote}</p>
     </div>
   )
 }

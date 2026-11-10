@@ -4,7 +4,7 @@
 const fr = {
   store: { name: "ATELIER", tagline: "Vêtements pensés pour durer." },
   nav: { shop: "Boutique", search: "Rechercher", cart: "Panier", logout: "Se déconnecter", admin: "Administration", help: "Aide", menu: "Menu", more: "Plus" },
-  footer: { contact: "Contact", allWilayas: "Livraison dans les 58 wilayas", cod: "Paiement à la livraison", whatsapp: "WhatsApp" },
+  footer: { contact: "Contact", whatsapp: "WhatsApp" },
   home: {
     heroTitle: "Nouvelle saison", heroCta: "Découvrir", latest: "Nouveautés", categories: "Par catégorie",
     shopNow: "Voir", store: "Notre boutique", directions: "Itinéraire", map: "Carte : la boutique", whatsapp: "Nous écrire sur WhatsApp",
@@ -149,14 +149,8 @@ const fr = {
     amountPerDay: "Montant commandé par jour", ordersPerMonth: "Commandes par mois", amountPerMonth: "Montant commandé par mois", allTime: "Depuis le début", byWilaya: "Wilayas qui commandent le plus",
     topProducts: "Meilleures ventes", noData: "Aucune commande sur la période.",
     import: "Importer", importTitle: "Importer des produits (CSV)",
-    importRules: [
-      "Une ligne = une variante (couleur × taille). Les lignes au même nom forment un seul produit.",
-      "Catégorie : une catégorie existante, par exemple « Chemises ».",
-      "Prix (DA) et stock : nombres entiers.",
-      "Produit déjà présent : les nouvelles variantes sont ajoutées, le prix et le stock mis à jour.",
-      "Depuis Excel, enregistrez en « CSV UTF-8 ». Les photos s'ajoutent ensuite sur la fiche produit.",
-      "Une seule erreur et rien n'est importé : corrigez les lignes indiquées, puis réessayez.",
-    ],
+    importStep1: "1. Le modèle", importStep1Text: "Remplissez-le dans Excel : une ligne par variante (couleur × taille), les lignes au même nom forment un produit. Enregistrez en « CSV UTF-8 ».",
+    importStep2: "2. Votre fichier", importNote: "Un produit déjà présent est mis à jour (variantes ajoutées, prix et stock). Une seule erreur et rien n'est importé.",
     importTemplate: "Télécharger le modèle", importFile: "Fichier CSV", importNothing: "Rien n'a été importé :",
     importBadFile: "Fichier refusé : un .csv de 1 Mo maximum (depuis Excel : Enregistrer sous › CSV UTF-8).",
     importEmpty: "Le fichier ne contient aucune ligne de produit.", importColumns: "Colonnes manquantes : {cols}.",
@@ -173,7 +167,7 @@ export type Dict = typeof fr
 const ar: Dict = {
   store: { name: "ATELIER", tagline: "ملابس مصممة لتدوم." },
   nav: { shop: "المتجر", search: "بحث", cart: "السلة", logout: "تسجيل الخروج", admin: "الإدارة", help: "مساعدة", menu: "القائمة", more: "المزيد" },
-  footer: { contact: "اتصل بنا", allWilayas: "التوصيل إلى 58 ولاية", cod: "الدفع عند الاستلام", whatsapp: "واتساب" },
+  footer: { contact: "اتصل بنا", whatsapp: "واتساب" },
   home: {
     heroTitle: "موسم جديد", heroCta: "اكتشف", latest: "وصل حديثاً", categories: "حسب الفئة", shopNow: "تسوّق",
     store: "متجرنا", directions: "الاتجاهات", map: "خريطة: موقع المتجر", whatsapp: "راسلونا على واتساب",
@@ -315,14 +309,8 @@ const ar: Dict = {
     amountPerDay: "قيمة الطلبات يومياً", ordersPerMonth: "الطلبات شهرياً", amountPerMonth: "قيمة الطلبات شهرياً", allTime: "منذ البداية", byWilaya: "الولايات الأكثر طلباً",
     topProducts: "الأكثر مبيعاً", noData: "لا توجد طلبات في هذه الفترة.",
     import: "استيراد", importTitle: "استيراد المنتجات (CSV)",
-    importRules: [
-      "سطر = متغيّر واحد (لون × مقاس). الأسطر التي تحمل نفس الاسم تشكّل منتجاً واحداً.",
-      "الفئة: فئة موجودة، مثل «Chemises».",
-      "السعر (د.ج) والمخزون: أعداد صحيحة.",
-      "منتج موجود: تُضاف المتغيرات الجديدة ويُحدَّث السعر والمخزون.",
-      "من Excel احفظ الملف بصيغة «CSV UTF-8». تُضاف الصور بعد ذلك من صفحة المنتج.",
-      "خطأ واحد يكفي لعدم استيراد أي شيء: صحّح الأسطر المذكورة ثم أعد المحاولة.",
-    ],
+    importStep1: "1. النموذج", importStep1Text: "املأه في Excel: سطر لكل متغيّر (لون × مقاس)، والأسطر التي تحمل نفس الاسم تشكّل منتجاً واحداً. احفظ بصيغة «CSV UTF-8».",
+    importStep2: "2. ملفك", importNote: "المنتج الموجود يُحدَّث (تُضاف المتغيرات، السعر والمخزون). خطأ واحد يكفي لعدم استيراد أي شيء.",
     importTemplate: "تنزيل النموذج", importFile: "ملف CSV", importNothing: "لم يُستورد أي شيء:",
     importBadFile: "ملف مرفوض: ملف ‎.csv‎ بحجم 1 ميغابايت كحد أقصى (من Excel: حفظ باسم › CSV UTF-8).",
     importEmpty: "لا يحتوي الملف على أي سطر منتج.", importColumns: "أعمدة ناقصة: {cols}.",

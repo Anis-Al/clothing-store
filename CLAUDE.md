@@ -503,7 +503,7 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   (≤3, same as the dashboard tile) / Rupture, category `FormSelect` (autoSubmit on a GET form), search
   (products: name; stock: product name or Référence). Products: "faible" = some variant ≤3, "rupture" =
   every variant at 0. Title shows the matching count.
-- Pagination: 5 products / 7 variants per page (user's choice; `PER_PAGE` at the top of each page),
+- Pagination: 7 products / 8 variants per page on desktop, 5 / 3 on phones (`PER_PAGE` / `PER_PAGE_PHONE` at the top of each page, phone sniffed from the headers),
   `Pager` (Précédent · Page n / N · Suivant, chevrons flip in RTL). Everything lives in the URL; helpers `listParams` / `listHref` / `paginate` in
   `lib/utils.ts` (unit-tested): empty params and page 1 stay out of URLs, a new filter or search goes back
   to page 1, an out-of-range `?page=` is clamped to the last page. Stock sort toggle keeps the filters.
@@ -1451,6 +1451,20 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 
 - Row items (user: ambiguous, then "no names"): the Articles cell is the piece count only, "2 article(s)"; the panel
   itemises. The panel address is ink, not muted (user).
+
+### 2026-11-10 — Import page simplified; list restyle tried and reverted
+- Tried (user: "same layout as orders in stock & products"): a `ListCard` frame + footer, a search-first `ListFilters`
+  with a segmented stock switch, and the Commandes header strip on the shared `Table`. Reverted the same hour (user):
+  Produits, Stock, `Table` and `ListFilters` are back to their committed state; only Commandes has that layout.
+- `/admin/products/import` simplified (user): two cards, "1. Le modèle" (one sentence + the template button) and
+  "2. Votre fichier" (the form), one muted rule line under them (`importStep1/2`, `importStep1Text`, `importNote`
+  replace the six `importRules`). Import logic untouched.
+
+- Page sizes (user: "fix the numbers"): Produits 7 on desktop / 5 on phones (same header sniff as Stock), Stock 8 / 3.
+  Measured so each list fits one screen (1280×800, 375×812) with its filters.
+
+- Footer facts strip (Livraison dans les 58 wilayas · Paiement à la livraison · Retrait en boutique · Point relais)
+  removed (user); the footer starts at the brand + columns. `t.footer.allWilayas` / `cod` dropped.
 
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.

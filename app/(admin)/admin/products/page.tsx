@@ -1,5 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
+import { headers } from "next/headers"
 import type { Prisma } from "@prisma/client"
 import { buttonVariants } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -9,10 +10,13 @@ import { formatPrice, getI18n, getSettings } from "@/lib/i18n"
 import { cn, listHref, listParams, paginate } from "@/lib/utils"
 
 const PATH = "/admin/products"
-const PER_PAGE = 5
+const PER_PAGE = 7 // rows fit a 1280×800 screen with the filters
+const PER_PAGE_PHONE = 5 // compact rows (same phone sniff as Stock)
 
 export default async function AdminProducts({ searchParams }: PageProps<"/admin/products">) {
   const cur = listParams(await searchParams)
+  const h = await headers()
+  const phone = h.get("sec-ch-ua-mobile") === "?1" || /Mobi/i.test(h.get("user-agent") ?? "")
   const { lowStock } = await getSettings()
   // low = at least one variant at or below the Réglages threshold; out = nothing left to sell
   const where: Prisma.ProductWhereInput = {
@@ -26,7 +30,7 @@ export default async function AdminProducts({ searchParams }: PageProps<"/admin/
     db.product.count({ where }),
     db.category.findMany({ orderBy: { name: "asc" } }),
   ])
-  const { page, pages, skip, take } = paginate(total, cur.page, PER_PAGE)
+  const { page, pages, skip, take } = paginate(total, cur.page, phone ? PER_PAGE_PHONE : PER_PAGE)
   const products = await db.product.findMany({
     where, skip, take, orderBy: { createdAt: "desc" }, include: { category: true, variants: true, images: { take: 1 } },
   })
