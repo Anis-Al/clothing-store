@@ -1242,6 +1242,17 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   button with a temporary number (`wa.me/213555123456`), hidden when empty; cart pickup line with the hours on line 2.
   Test hours and number removed afterwards; the user's own coordinates (Douira) were left as they set them.
 
+### 2026-11-10 — Yalidine data files checked against dzship communes
+- User asked to "prepare the data files" for the Yalidine tariff + relay points: they already exist and ship in the
+  image (`data/yalidine-fees.csv` 48 destinations → 58 wilayas, `data/yalidine-desks.csv` 200 agencies; read at runtime by
+  `loadCourierDefaults`). Checked them: all 200 rows parse, every wilaya gets a tariff. But 60 agencies' Commune column
+  used Yalidine's own spelling instead of dzship's: 50 by accents / hyphens ("Béjaïa" → "Bejaia", "Tizi Ouzou" →
+  "Tizi-Ouzou"), 9 by more ("Mahelma" → "Maalma", "Ksar Boukhari" → "Ksar El Boukhari", "Bordj Bou Arreridj" →
+  "B. B. Arreridj", which is dzship's canonical name, "In Salah" → "Ain Salah", "El Menia" → "El Meniaa"…). That commune is
+  what a relay parcel is sent with. Only that column was rewritten (diff of the other columns empty); the same 60 rows
+  fixed in the local DB by `deskId`. Re-check: 200 / 200 communes exact for their wilaya. A store that already loaded the
+  old rows keeps them (the button only adds missing `deskId`s): delete and reload the points there if needed.
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - **SEO, still missing** (simplest first): `metadataBase` from a new `SITE_URL` env var (needed by the rest);
