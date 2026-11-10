@@ -21,8 +21,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
       {/* phones: the aside is display: contents, so the nav row alone sticks to the top while the
-          store name and the links below it scroll away */}
-      <aside className="contents text-canvas md:flex md:w-60 md:shrink-0 md:flex-col md:gap-1 md:bg-ink md:p-6">
+          store name and the links below it scroll away. Desktop: pinned, one viewport tall, so the links at its
+          end (store, language, logout) are always in view however long the page is. */}
+      <aside className="contents text-canvas md:sticky md:top-0 md:flex md:h-dvh md:w-60 md:shrink-0 md:flex-col md:gap-1 md:overflow-y-auto md:bg-ink md:p-6">
         <Link href="/admin" className="bg-ink px-4 pt-4 pb-2 font-display text-3xl tracking-wide md:mb-4 md:p-0">{t.store.name}</Link>
         <nav className="sticky top-0 z-30 flex gap-1 overflow-x-auto bg-ink px-4 py-2 md:static md:flex-col md:p-0">
           {links.map(([href, label]) => (

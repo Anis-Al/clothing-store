@@ -1,18 +1,34 @@
 import Link from "next/link"
 import type { Category, Product } from "@prisma/client"
-import { ChevronLeft, ChevronRight, Search, SlidersHorizontal } from "lucide-react"
+import { ChevronLeft, ChevronRight, CircleHelp, Search, SlidersHorizontal } from "lucide-react"
 import { FormSelect } from "@/components/form-select"
 import { buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { fill, type Dict } from "@/lib/i18n"
 import { categoryOptions, cn, listHref, type ListParams } from "@/lib/utils"
 
+// Help icon next to a label: the text shows on hover / focus (desktop) and on tap (phones: the tap gives the button
+// hover or focus). Pure CSS, no popover library. Desktop: 16rem bubble below the icon; phones: a bar pinned at the bottom.
+export function Help({ text }: { text: string }) {
+  const id = text.length + "-" + text.slice(0, 12).replace(/\W/g, "")
+  return (
+    <span className="group relative inline-flex">
+      <button type="button" aria-describedby={id} className="grid size-5 place-items-center rounded-full text-mute hover:text-ink focus:text-ink focus:outline-none">
+        <CircleHelp className="size-4" />
+      </button>
+      <span id={id} role="tooltip"
+        className="pointer-events-none z-20 hidden rounded-lg bg-ink p-3 text-xs font-normal leading-snug text-canvas group-hover:block group-focus-within:block max-md:fixed max-md:inset-x-4 max-md:bottom-4 md:absolute md:start-0 md:top-full md:mt-1 md:w-64">
+        {text}
+      </span>
+    </span>
+  )
+}
+
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="text-sm font-medium">{label}</span>
+      <span className="flex items-center gap-1.5 text-sm font-medium">{label}{hint && <Help text={hint} />}</span>
       {children}
-      {hint && <span className="text-xs text-mute">{hint}</span>}
     </label>
   )
 }
@@ -49,11 +65,16 @@ export function MatrixFields({ t }: { t: Dict }) {
 }
 
 export async function Notice({ t, sp }: { t: Dict; sp: Promise<Record<string, string | string[] | undefined>> }) {
-  const { saved, error } = await sp
+  const { saved, error, detail } = await sp
   const msg = typeof error === "string" && error in t.admin ? t.admin[error as keyof Dict["admin"]] : undefined
   // Toast, not inline: on long edit pages an inline notice at the top is off-screen after saving.
   const toast = "fixed end-4 bottom-4 z-50 max-w-sm bg-canvas p-4 font-medium shadow-[0_0_0_1px_var(--color-hairline)]"
-  if (msg) return <p role="alert" className={`${toast} animate-in fade-in slide-in-from-bottom-4 text-sale`}>{msg}</p>
+  // ?detail= = a message from an outside service (the courier's refusal), shown after the dictionary line
+  if (msg) return (
+    <p role="alert" className={`${toast} animate-in fade-in slide-in-from-bottom-4 text-sale`}>
+      {msg}{typeof detail === "string" && detail && <span className="mt-1 block font-normal text-ink" dir="auto">{detail}</span>}
+    </p>
+  )
   if (saved) return <p role="status" className={`${toast} toast-auto text-success`}>{t.admin.saved}</p>
   return null
 }
@@ -61,8 +82,9 @@ export async function Notice({ t, sp }: { t: Dict; sp: Promise<Record<string, st
 const chip = (on: boolean) =>
   cn("inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium whitespace-nowrap", on ? "border-ink bg-ink text-canvas" : "border-hairline hover:border-ink")
 
-// Réglages = one tab per short form (?tab=, same page) + Catégories (own route: its own forms per row).
-export const SETTINGS_TABS = ["store", "home", "delivery", "stock"] as const
+// Réglages = one tab per short form (?tab=, same page; Transporteur also holds the relay points) + Catégories
+// (own route: its own forms per row).
+export const SETTINGS_TABS = ["store", "home", "delivery", "courier"] as const
 export type SettingsTab = (typeof SETTINGS_TABS)[number] | "categories"
 
 export function SettingsNav({ t, active }: { t: Dict; active: SettingsTab }) {
@@ -70,7 +92,7 @@ export function SettingsNav({ t, active }: { t: Dict; active: SettingsTab }) {
     ["store", t.admin.sStore, "/admin/settings"],
     ["home", t.admin.sHome, "/admin/settings?tab=home"],
     ["delivery", t.admin.delivery, "/admin/settings?tab=delivery"],
-    ["stock", t.admin.lowStock, "/admin/settings?tab=stock"],
+    ["courier", t.admin.sCourier, "/admin/settings?tab=courier"],
     ["categories", t.admin.categories, "/admin/settings/categories"],
   ]
   return (

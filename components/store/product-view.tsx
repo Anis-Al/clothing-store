@@ -55,7 +55,7 @@ export function ProductView(props: {
   if (!variants.length) return null
 
   return (
-    <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_400px] md:gap-12">
+    <div className="mx-auto grid max-w-[1100px] gap-8 md:grid-cols-[minmax(0,1fr)_400px] md:gap-12">
       {/* gallery: thumbnail rail + square main image */}
       <div className="flex min-w-0 flex-col-reverse gap-2 sm:flex-row sm:items-start">
         <div className="flex shrink-0 gap-2 sm:flex-col">
@@ -74,7 +74,7 @@ export function ProductView(props: {
         </div>
         <div className="relative aspect-square w-full min-w-0 bg-cloud">
           {main && (
-            <Image src={main.url} alt={`${product.name} — ${color}`} fill priority sizes="(max-width: 768px) 100vw, 60vw" className="object-cover" />
+            <Image src={main.url} alt={`${product.name} — ${color}`} fill priority sizes="(max-width: 768px) 100vw, 600px" className="object-cover" />
           )}
         </div>
       </div>

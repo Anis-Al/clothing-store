@@ -8,6 +8,9 @@ type LastOrder = {
   ref: string
   total: number // items + fee
   fee?: number // delivery fee (absent in summaries written before it existed)
+  method?: "HOME" | "PICKUP" | "STOPDESK"
+  pickup?: string // shop address, PICKUP orders only
+  desk?: string // "name — address" of the relay point, STOPDESK orders only
   items: { name: string; color: string; size: string; qty: number; price: number; image?: string }[]
 }
 
@@ -46,9 +49,15 @@ export function OrderSummary({ code }: { code: string }) {
       </ul>
       {!!order.fee && (
         <p className="mt-4 flex justify-between border-t border-hairline pt-4">
-          <span>{t.cart.shipping}</span>
+          <span>{order.method === "STOPDESK" ? t.cart.desk : t.cart.shipping}</span>
           <span>{formatPrice(order.fee, locale)}</span>
         </p>
+      )}
+      {order.method === "STOPDESK" && order.desk && (
+        <p className="mt-4 border-t border-hairline pt-4 text-sm"><span className="font-medium">{t.cart.deskAt}</span> {order.desk}</p>
+      )}
+      {order.method === "PICKUP" && order.pickup && (
+        <p className="mt-4 whitespace-pre-line border-t border-hairline pt-4 text-sm"><span className="font-medium">{t.cart.pickupAt}</span> {order.pickup}</p>
       )}
       <p className="mt-4 flex justify-between border-t border-hairline pt-4 font-medium">
         <span>{t.cart.total}</span>

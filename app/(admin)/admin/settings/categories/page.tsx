@@ -80,12 +80,11 @@ export default async function Categories({ searchParams }: PageProps<"/admin/set
         <Field label={t.admin.newCategory}>
           <Input name="name" required maxLength={60} placeholder="Vestes, Polos…" className="w-64" />
         </Field>
-        <Field label={t.admin.parentCategory}>
+        <Field label={t.admin.parentCategory} hint={t.admin.categoriesHint}>
           <FormSelect name="parentId" placeholder={t.admin.topLevel} items={parentItems()} className="w-64" />
         </Field>
         <Button type="submit">{t.admin.add}</Button>
       </form>
-      <p className="text-sm text-mute">{t.admin.categoriesHint}</p>
 
       {/* One fold per main category: folded = name, its sub-categories, product count; open = the edit rows.
           Next remounts the page when the search params change, so after a save only ?open= is unfolded. */}

@@ -56,10 +56,15 @@ async function main() {
     create: { username: "admin", passwordHash: await bcrypt.hash("password", 10), role: "ADMIN" },
   })
 
-  // Demo categories + products only go into an empty store: categories are managed in /admin/settings/categories,
+  // No delivery tariff or relay point is seeded: they belong to the shop's courier (Réglages › Transporteur loads
+  // Yalidine's when that is the courier; others are typed in).
+
+  // Categories + demo products only go into an empty store: categories are managed in /admin/settings/categories,
   // so a restart must never bring back one the admin deleted.
   if ((await prisma.category.count()) || (await prisma.product.count()))
     return console.log("Catalogue déjà rempli, démo ignorée.")
+  // SEED_DEMO=0: a real store launch — the men's category tree, no demo products or placeholder images.
+  const demo = !["0", "false", "no"].includes((process.env.SEED_DEMO ?? "").toLowerCase())
 
   // The shop only lists categories that have products; the rest wait in the admin.
   const cats: Record<string, { id: string }> = {}
@@ -68,6 +73,8 @@ async function main() {
     for (const name of subs)
       cats[slugify(name)] = await prisma.category.create({ data: { name, slug: slugify(name), parentId: parent.id } })
   }
+
+  if (!demo) return console.log("Seed OK (sans produits de démo) — admin / password")
 
   for (const p of PRODUCTS) {
     const product = await prisma.product.create({

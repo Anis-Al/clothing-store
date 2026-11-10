@@ -15,7 +15,13 @@ class PriceError extends Error {
 
 // Guest checkout, cash on delivery. Prices come from the DB, never from the client: the prices and fee the
 // cart showed (`price`, `fee`) are only compared, so the customer never orders at a total they didn't see.
-export type Shipping = { fullName: string; phone: string; wilaya: string; commune: string; address: string }
+// method PICKUP (collected at the shop): name + phone only, no fee; offered only while Réglages has a pickup address.
+// method STOPDESK: a StopDesk row (stopDeskId) gives wilaya and address text; name + phone from the customer.
+// The fee comes from WilayaFee (Réglages › Livraison): the destination wilaya's home or relay tariff.
+export type Shipping = {
+  method?: "HOME" | "PICKUP" | "STOPDESK"; stopDeskId?: string
+  fullName: string; phone: string; wilaya: string; commune: string; address: string
+}
 
 // ponytail: in-memory per-IP limit (10 attempts / 10 min, failed ones count), reset by a restart; per-IP rules in Caddy if it must survive
 const recent = new Map<string, number[]>()
@@ -47,21 +53,30 @@ export async function checkout(lines: { variantId: string; qty: number; price: n
   }
   if (!qty.size) return { error: t.cart.empty }
 
+  const method = (["HOME", "PICKUP", "STOPDESK"] as const).find((x) => x === shipping?.method) ?? "HOME"
+  const pickup = method === "PICKUP"
+  const desk = method === "STOPDESK" ? await db.stopDesk.findUnique({ where: { id: String(shipping?.stopDeskId ?? "") } }) : null
+  if (method === "STOPDESK" && !desk) return { error: t.cart.missingDesk }
   const fullName = String(shipping?.fullName ?? "").trim().slice(0, 100)
-  const address = String(shipping?.address ?? "").trim().slice(0, 300)
-  const wilaya = String(shipping?.wilaya ?? "")
-  const commune = String(shipping?.commune ?? "")
+  const address = pickup ? "" : desk ? `${desk.name} — ${desk.address}`.replace(/ — $/, "") : String(shipping?.address ?? "").trim().slice(0, 300)
+  const wilaya = pickup ? "" : desk ? desk.wilaya : String(shipping?.wilaya ?? "")
+  const commune = method === "HOME" ? String(shipping?.commune ?? "") : ""
   // the commune must belong to the wilaya: couriers need both exactly
-  if (!fullName || !address || !isCommune(wilaya, commune)) return { error: t.cart.missing }
+  if (!fullName || (method === "HOME" && (!address || !isCommune(wilaya, commune))))
+    return { error: pickup ? t.cart.missingPickup : desk ? t.cart.missingDesk : t.cart.missing }
   const phone = normalizePhone(String(shipping?.phone ?? ""))
   if (!phone) return { error: t.cart.badPhone }
 
-  const { deliveryFee } = await getSettings()
+  const { pickupEnabled, stopdeskEnabled } = await getSettings()
+  // method switched off since the cart loaded: same path as a fee change (the cart refreshes without the option)
+  if ((pickup && !pickupEnabled) || (desk && !stopdeskEnabled)) return { error: t.errors.priceChanged, prices: {} }
+  const tariff = pickup ? null : await db.wilayaFee.findUnique({ where: { wilaya } })
+  const shippingFee = pickup ? 0 : desk ? (tariff?.desk ?? 0) : (tariff?.home ?? 0)
   try {
     const order = await db.$transaction(async (tx) => {
       const variants = await tx.productVariant.findMany({ where: { id: { in: [...qty.keys()] } }, include: { product: true } })
       // The cart keeps the price from when the item was added; the admin may have changed it (or the fee) since.
-      if (Number(fee) !== deliveryFee || variants.some((v) => v.price !== shown.get(v.id)))
+      if (Number(fee) !== shippingFee || variants.some((v) => v.price !== shown.get(v.id)))
         throw new PriceError(Object.fromEntries(variants.map((v) => [v.id, v.price])))
       let total = 0
       for (const [id, n] of qty) {
@@ -77,8 +92,9 @@ export async function checkout(lines: { variantId: string; qty: number; price: n
       }
       return tx.order.create({
         data: {
-          totalAmount: total + deliveryFee,
-          shippingFee: deliveryFee,
+          totalAmount: total + shippingFee,
+          shippingFee,
+          method, stopDeskId: desk?.id,
           fullName, phone, wilaya, commune, address,
           items: { create: [...qty].map(([variantId, quantity]) => ({ variantId, quantity, priceAtPurchase: variants.find((v) => v.id === variantId)!.price })) },
         },

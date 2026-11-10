@@ -1,0 +1,49 @@
+Destination,Zone,Délai,Tarif à domicile,Tarif stop-desk,Tarif retour
+Alger,0,1,500,450,250
+Blida,1,1,650,600,250
+Boumerdès,1,1,650,600,250
+Tipaza,1,1,650,600,250
+Chlef,2,1,850,700,250
+Oum El Bouaghi,2,1,850,700,250
+Batna,2,1,850,700,250
+Béjaïa,2,1,850,700,250
+Bouira,2,1,850,700,250
+Tlemcen,2,1,850,700,250
+Tiaret,2,1,850,700,250
+Tizi Ouzou,2,1,850,700,250
+Jijel,2,1,850,700,250
+Sétif,2,1,850,700,250
+Saïda,2,1,850,700,250
+Skikda,2,1,850,700,250
+Sidi Bel Abbès,2,1,850,700,250
+Annaba,2,1,850,700,250
+Guelma,2,1,850,700,250
+Constantine,2,1,850,700,250
+Médéa,2,1,850,700,250
+Mostaganem,2,1,850,700,250
+M'Sila,2,1,850,700,250
+Mascara,2,1,850,700,250
+Oran,2,1,850,700,250
+Bordj Bou Arreridj,2,1,850,700,250
+El Tarf,2,1,850,700,250
+Tissemsilt,2,1,850,700,250
+Khenchela,2,1,850,700,250
+Souk Ahras,2,1,850,700,250
+Mila,2,1,850,700,250
+Aïn Defla,2,1,850,700,250
+Aïn Témouchent,2,1,850,700,250
+Relizane,2,1,850,700,250
+Laghouat,3,1,1000,850,250
+Biskra,3,1,1000,850,250
+Tébessa,3,1,1000,850,250
+Djelfa,3,1,1000,850,250
+Ouargla,3,2,1000,850,250
+El Oued,3,1,1000,850,250
+Ghardaïa,3,2,1000,850,250
+Adrar,4,3,1450,1150,250
+Béchar,4,3,1450,1150,250
+El Bayadh,4,2,1450,1150,250
+Naâma,4,3,1450,1150,250
+Tamanrasset,5,5,1650,1550,250
+Illizi,5,6,1650,1550,250
+Tindouf,5,5,1650,1550,250

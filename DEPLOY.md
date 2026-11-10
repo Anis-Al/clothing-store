@@ -44,7 +44,15 @@ npm run dev
 ```
 
 If the database already exists, `db:migrate` doesn't re-run the seed. Use `npm run db:seed` for that
-(it only adds what's missing: the admin user, plus demo categories and products into an empty store).
+(it only adds what's missing: the admin user, plus the category tree and demo products into an empty store).
+To start with an empty catalog (no demo products), reset with `SEED_DEMO=0`:
+
+```bash
+SEED_DEMO=0 npx prisma migrate reset --force
+```
+
+(PowerShell: `$env:SEED_DEMO='0'; npx prisma migrate reset --force`.) The demo placeholder images stay in
+`public/uploads/seed-*.svg`; delete them by hand.
 
 ### 0.3 Checks before you deploy
 
@@ -131,8 +139,9 @@ One Node.js process. No external services.
 
 On every start the container does this by itself:
 1. Applies new database migrations (`prisma migrate deploy`).
-2. Runs the seed. It creates the `admin` user if it's missing. Demo categories and products are only
+2. Runs the seed. It creates the `admin` user if it's missing. The category tree and demo products are only
    added to an **empty** store, so a restart never overwrites (or brings back) your categories and products.
+   With `SEED_DEMO=0` in the environment, a fresh store gets the categories only, no demo products.
 3. Starts the site on port 3000.
 
 ### Environment variables
@@ -143,6 +152,14 @@ On every start the container does this by itself:
 | `DATABASE_URL` | no | `file:/app/prisma/store.db` (set in the image) |
 | `AUTH_TRUST_HOST` | no | `true` (set in the image; needed behind a reverse proxy) |
 | `PORT` | no | `3000` |
+| `SEED_DEMO` | no | Set to `0` **before the first start** of a real store: the seed creates the admin and the category tree but no demo products. Has no effect once the store has categories or products. |
+
+The delivery company (Yalidine, ZR Express, Maystro, NOEST, an Ecotrack courier…) and its API keys are set in the admin
+(Réglages › Transporteur), not in the environment. Parcels are created through the free gateway `freeship.dzbuild.com`
+(dzship): the server needs outbound HTTPS to it, and the keys are sent with each call (dzship says it stores nothing).
+Delivery fees per wilaya (Réglages › Livraison) and relay points (Réglages › Transporteur) start empty (an empty
+tariff = free delivery). With Yalidine as the courier, one button on the Transporteur tab loads Yalidine's tariff and
+its 200 agencies (`data/yalidine-*.csv`); other couriers type theirs.
 
 ---
 
@@ -195,6 +212,7 @@ Create `/srv/atelier.env` (outside the project folder, so updates never touch it
 
 ```bash
 # AUTH_SECRET=...   optional, see the table above
+SEED_DEMO=0         # real store: no demo products on the first start
 ```
 
 Store name, WhatsApp number, delivery fee and the rest are set later in the admin, `/admin/settings`.

@@ -30,7 +30,8 @@ npm run dev                          # http://localhost:3000, admin at /admin (a
 npm run db:migrate                   # prisma migrate dev (first run creates prisma/dev.db and seeds)
                                      # schema change: stop dev first (Windows EPERM), restart it after
                                      # (a running dev keeps the old Prisma client → 500 on new models)
-npm run db:seed                      # admin; demo categories + products only into an empty store
+npm run db:seed                      # admin; category tree + demo products only into an empty store
+                                     # SEED_DEMO=0: categories only, no demo products (real store launch)
 npm run typecheck && npm run lint && npm test
 npm run build && npm start           # stop the dev server before building (both use .next/)
 npm run admin:set -- USER PASSWORD   # create an admin or change a password
@@ -100,20 +101,44 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - **Browser storage keys are namespaced** `atelier:*` (`atelier:cart`, `atelier:shipping`,
   `atelier:last-order`): localStorage is per origin, and the other local projects on
   localhost:3000 use `cart` too. Bump the cart `version` if `CartItem` changes shape.
+  `atelier:shipping` = the whole checkout form incl. `method` and `stopDeskId` (merged on save, so a pickup
+  order keeps the saved address); `atelier:last-order` = `{ ref, total, fee, method, pickup?, desk?, items }`.
 - **Réglages** (`/admin/settings`, model `Settings`, single row `id = 1` inserted by its migration):
-  store name, FR/AR tagline / hero title / delivery text, hero image, WhatsApp number, flat delivery
-  fee, low-stock threshold. Tabs (`SettingsNav` in `components/admin/fields.tsx`): Boutique · Page
-  d'accueil · Livraison · Stock faible are `?tab=` on the same page, one short form each;
-  `updateSettings(tab, f)` writes only the fields the form posted, so a new setting goes in exactly one
-  tab. Catégories is the last tab, its own route. Read with `getSettings()` (`lib/i18n.ts`, React
-  `cache` = one query per request). Empty text = dictionary default. Never hard-code the "Stock faible"
-  `3` again: use `lowStock`.
+  store name, WhatsApp number, FR/AR tagline, store address, low-stock threshold (Boutique); FR/AR hero title,
+  hero image (Page d'accueil); pickup / stop-desk switches, FR/AR delivery text, then the per-wilaya tariff table
+  (Livraison);
+  Yalidine API keys + origin wilaya, then the relay points (`StopDesk`, add / delete forms) (Yalidine). Tabs
+  (`SettingsNav` in `components/admin/fields.tsx`): Boutique · Page d'accueil · Livraison · Yalidine are `?tab=` on
+  the same page, one short form each; `updateSettings(tab, f)` writes only the fields the form posted (`f.has`), so
+  a new setting goes in exactly one tab, and a checkbox needs a hidden `""` twin + `f.getAll(k).includes("on")`.
+  Catégories is its own route, listed in the same tab row (`SettingsTab`). Read with `getSettings()`
+  (`lib/i18n.ts`, React `cache` = one query per request). Empty text = dictionary default. Never hard-code the
+  "Stock faible" `3` again: use `lowStock`. No loose explanatory text on Réglages: every explanation is a `hint`
+  (help icon); the FR/AR `pair()` fields carry `settingsHint` ("empty = default") on their first field.
 - **Wilaya + commune**: `lib/wilayas.ts` (58 wilayas, value `"16 - Alger"`) and `lib/communes.ts` (1541 communes
   from the user's CSV, keyed by wilaya **code**, `[latin, arabic]`). Orders store the commune's Latin name; labels
   follow the UI language. `checkout` refuses a commune outside the posted wilaya (`isCommune`). Never rename stored
   wilaya values: map spellings to a courier's list (Yalidine) at export / API time.
-- **Delivery fee**: flat, from Réglages, re-read by `checkout` (never from the client).
-  `Order.totalAmount` = items + `Order.shippingFee` (the fee at checkout time); revenue includes it.
+- **Delivery fee**: per destination wilaya and method, model `WilayaFee { wilaya, home, desk }` (one row per wilaya,
+  table in Réglages › Livraison, `updateWilayaFees` upserts all 58). Nothing is seeded (the tariff is the courier's):
+  a missing row = 0 = free. When the saved courier is Yalidine or a sister network, Réglages › Transporteur shows
+  "Charger la grille tarifaire et les agences Yalidine" (`loadCourierDefaults`: `data/yalidine-fees.csv` +
+  `data/yalidine-desks.csv` parsed by `lib/defaults.ts`; the 2019 wilayas take their former parent's tariff; replaces
+  every tariff row, adds the agencies missing by `deskId`). Other couriers type their tariff. `checkout` re-reads it (never from the client); the cart gets `fees[wilaya] = [home, desk]` and shows
+  the fee as the wilaya changes. `Order.totalAmount` = items + `Order.shippingFee` (the fee at checkout time);
+  revenue includes it. No flat fee any more.
+- **Delivery method** (`Order.method`, enum `DeliveryMethod`): `HOME` (courier, address, flat fee), `PICKUP` (collected
+  at the shop: name + phone only, `wilaya`/`commune`/`address` = `""`, fee 0) or `STOPDESK` (Yalidine relay point:
+  `Order.stopDeskId` → `StopDesk` row, `wilaya` = the point's, `address` = "name — address" copied as text, fee = the
+  point's `fee`; `onDelete: SetNull`, so deleting a point keeps the order readable). Pickup is offered while
+  `Settings.pickupEnabled` (checkbox, Réglages › Livraison) is on; the address shown with it is `Settings.storeAddress`
+  (Réglages › Boutique, optional). Stop-desk is offered while `Settings.stopdeskEnabled` is on **and** a `StopDesk` row exists (Réglages ›
+  Transporteur: wilaya, name, commune, address, the point's id at the courier, typed in, or Yalidine's 200 agencies
+  loaded by the button above when Yalidine is the courier; folded per wilaya in the admin; commune + `deskId` are what
+  the API needs to route a parcel there; the fee is the wilaya's `WilayaFee.desk`, not per point). The cart shows the method tiles only when more than one method is offered; the
+  customer's last method is saved in `atelier:shipping` and falls back to `HOME` if no longer offered. `checkout`
+  derives wilaya/address/fee from the desk row, never from the client. Statuses are shared: on a pickup order the
+  admin select labels `SHIPPED` "Prête en boutique" (`t.admin.readyPickup`); `RETURNED` = not collected (both methods).
 - **Checkout price check**: the cart sends the prices and fee it displayed; if any differs from the DB,
   `checkout` refuses (`t.errors.priceChanged`) and returns the current prices, the cart reprices
   (`reprice`) and refreshes (new fee). The customer never orders at a total they didn't see.
@@ -125,15 +150,24 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   rounded ends, solid hairline grid, never two y-axes (counts and dinars are separate charts).
   Charts render `dir="ltr"` in Arabic too. Each chart has `accessibilityLayer` (keyboard + tooltip);
   rankings carry their value at the bar tip, the per-day values have an `sr-only` table.
-- **Admin tables on phones**: a table whose rows hold inputs, buttons or a status uses `<Table stack>`:
-  below `md` the header is hidden and each row wraps its cells (no sideways scroll). Per cell:
-  `max-md:basis-full` = own line, `max-md:ms-auto` = pushed to the end, `data-label={…}` = small caption
-  above the value (replaces the hidden header for inputs). Read-only lists (Produits) stay plain tables.
-- **Admin filters on phones** = one row on every list (Produits, Stock, Commandes): search + `FiltersPill`
-  ("Filtres (n)", `components/admin/fields.tsx`), an empty-bodied `<details class="peer">` whose next sibling
-  (chips, category, dates) unfolds below with `max-md:hidden max-md:basis-full peer-open:flex`. Desktop: no pill;
-  Produits/Stock one row; Commandes `md:contents` → status tab strip (text, 2px ink underline, hairline) on row 1,
-  dates + search on row 2.
+- **Admin field hints** are help icons, never a muted line under the field: `Field hint="…"` or `<Help text="…" />`
+  (`components/admin/fields.tsx`): hover / focus bubble on desktop, tap → bottom bar below `md`. Only a short general
+  note may stay as text (Réglages has none).
+- **Courier API** (`lib/courier.ts`, catalog `lib/couriers.ts`): the shop picks **one** delivery company in Réglages ›
+  Transporteur (`Settings.courier` = a key of `COURIERS`, 99 Algerian couriers with their credential field names,
+  generated from dzship's `GET /v1/couriers`; `courierKeys` = JSON of those fields; `courierFromWilaya`, required by
+  the Yalidine family). Once `courierReady(settings)`, Commandes shows "Envoyer à <courier>" on open home / relay
+  orders → `sendToCourier(orderId, back)` creates the parcel through **dzship** (`https://freeship.dzbuild.com/v1/orders`:
+  free gateway, one request shape for every courier; the shop's credentials travel in each call and are not stored,
+  per its docs), keeps `Order.courier` + `tracking` + `labelUrl`, leaves the status to the admin. `codAmount =
+  totalAmount` with `freeShipping: true` (the customer pays exactly the total they saw; the shop pays the courier's
+  fee out of it). The order is claimed (`tracking = "…"`, conditional `updateMany`) before the call, so a double
+  click can't create two parcels; a refusal clears it and shows the gateway's message in the toast
+  (`?error=courierRefused&detail=…`, `Notice` renders `detail` under the dictionary line). Pickup and final orders
+  never get the button; a relay order needs its point's `commune` (`?error=courierDesk`), the point's `deskId` is sent
+  when set. The courier picker is a GET form (`?tab=courier&courier=<key>` re-renders that courier's credential
+  fields, password inputs: empty = keep the stored value; "— Aucun" = feature off). "Sandbox" in the list tests the
+  flow without creating anything. Switching to a courier's own API later = `createParcel()` only.
 
 ## Design system mapping (Nike → this app)
 
@@ -787,6 +821,156 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - Dockerfile: `TZ=Africa/Algiers` (dashboard day buckets, date filter). Docker build still not run.
 - typecheck, lint, 7 tests clean.
 
+### 2026-11-09 — Seed without demo products (`SEED_DEMO=0`)
+- Request: "launch without demo data". The seed now reads `SEED_DEMO`: `0` / `false` / `no` → admin + the men's
+  category tree only (the tree is the real store's, not demo), no demo products and no placeholder SVGs. Default
+  unchanged (3 demo products). Still only into an empty store, so it matters on the first start only.
+  Documented in `.env.example`, `DEPLOY.md` (0.2 reset recipe, start sequence, env table, `/srv/atelier.env`).
+- Verified on scratch DBs (`migrate deploy` + seed twice): `SEED_DEMO=0` → 1 user, 23 categories (6 main), 0
+  products, 0 images; default → 3 products, 29 variants, 8 images; second run "Catalogue déjà rempli" both times.
+- Local `prisma/dev.db` then reset with `SEED_DEMO=0` (on the user's explicit go-ahead; Prisma also wanted
+  `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`), `public/uploads/seed-*.svg` deleted. The old data (4 test
+  orders, 4 products) is in `prisma/backups/store-2026-11-09-12-35.db`. The user then added their first real
+  product (Hoodie La Martina) and renamed the store "Le Repère" in Réglages.
+
+### 2026-11-09 — PDP image capped on desktop
+- "Product image too big on desktop": at 1440px the gallery column got ~900px (square image 824px). The PDP grid
+  (`components/store/product-view.tsx`) is now `mx-auto max-w-[1100px]`: image 580px, info column still 400px;
+  `sizes` hint `600px` above `md`. Phones unchanged. Verified at 1440px with a temp product (deleted after).
+
+### 2026-11-09 — Hosting notes (no code)
+- Questions answered in chat, kept here for the deploy: the app needs a Linux VPS (long-running Node + writable
+  disk for SQLite and uploads); shared cPanel/PHP plans can't run it, a CloudLinux cPanel plan with Node 22 +
+  Terminal can but with a 1 GB RAM cap (build elsewhere, Passenger cold starts). Algerian VPS offers (Icosnet,
+  Hostarts, Ayrade, Octenium, Algérie Télécom, ~2 400–5 000 DA/month, CIB/Edahabia) fit; a 4 vCPU / 8 GB one also
+  runs a small Odoo. Loi 18-05 (e-commerce) requires a registre du commerce and a site "hébergé en Algérie" under
+  `.com.dz`; loi 18-07 covers the customer data. The user's client is a physical shop (has an RC), so local VPS +
+  `.com.dz` is the path; add the e-commerce activity to the RC at the CNRC.
+
+### 2026-11-09 — Store pickup ("Retrait en boutique")
+- Request: other "expedition methods", first of all collecting the order at the physical shop. Migration
+  `delivery_method`: `enum DeliveryMethod { HOME, PICKUP }`, `Order.method @default(HOME)`, `Settings.pickupAddress`
+  (≤ 200 chars, textarea in Réglages › Livraison; empty = pickup not offered, so the feature is a setting, no flag).
+- Cart: when pickup is offered, two radio tiles (Livraison à domicile / Retrait en boutique) under the heading
+  "Mode de réception"; pickup hides wilaya, commune and address (unmounted, so `required` doesn't block), shows the
+  shop address, fee line reads "Retrait en boutique · Gratuite", footnote "Paiement en boutique au retrait…". The
+  choice is saved in `atelier:shipping` with the rest (merged, so a saved address survives a pickup order).
+  `checkout(lines, fee, shipping)`: `shipping.method`; pickup = fee 0 (compared like the flat fee), name + phone
+  only (`t.cart.missingPickup`). `/merci` summary (`atelier:last-order` + `method`, `pickup`) shows the address.
+  `t.confirm.call` now says "confirmer votre commande" (was "la livraison").
+- Admin Commandes: the Livraison cell shows name, phone links and a "Retrait en boutique" badge instead of the
+  address (guard is now `o.fullName`, not `o.wilaya`); the status select labels Expédiée "Prête en boutique" on
+  pickup orders. No method filter yet.
+- Verified (dev, 1024px): fee 400 + address saved in Réglages → cart defaults to home (400 DA), pickup tile →
+  fields collapse, "Gratuite", total 4 500; order → `/merci` with the address line; DB row `method PICKUP`,
+  `shippingFee 0`, empty wilaya/commune/address; admin badge + select items "En attente · Confirmée · Prête en
+  boutique · Livrée · Annulée". Test order + product deleted, fee and address reset to 0 / "". typecheck, lint,
+  7 tests clean. Dev server was stopped (preview pane) for the migration.
+
+### 2026-11-09 — Stop-desk (Yalidine relay points)
+- Second method, picked by the user after pickup. Yalidine's `/centers` + `/deliveryfees` need merchant API keys we
+  don't have, so the points are a small admin table: migration `stop_desk` = `StopDesk { wilaya, name, address, fee,
+  yalidineId? }`, `DeliveryMethod.STOPDESK`, `Order.stopDeskId?` (SetNull). New Réglages tab **Points relais**
+  (`/admin/settings/desks`, `SettingsTab` + nav entry in `components/admin/fields.tsx`): add form (wilaya select, name,
+  address, fee) + `Table stack` list with delete; actions `createStopDesk` / `deleteStopDesk` (`?saved=1`).
+- Cart: a third tile "Point relais" when desks exist (grid 2 or 3 columns); its form = wilaya (only wilayas with a
+  point) → point (`FormSelect` rows "name — address · fee", trigger = name) → name + phone. Fee line "Point relais ·
+  350 DA" ("—" until a point is picked). `checkout`: `stopDeskId` → desk row or `t.cart.missingDesk`; fee compared
+  against the desk's, `address` = "name — address". `/merci` gets `desk` in `atelier:last-order`. Admin Commandes:
+  "Point relais" badge above the wilaya + desk text.
+- Verified (dev, pane hidden → DOM-driven): two points added (Alger 350, Oran 450), cart primed with a saved STOPDESK
+  choice → "Point relais 350 DA", total 4 850, both selects prefilled → order → `/merci` with the point line → DB
+  `STOPDESK`, fee 350, wilaya "16 - Alger", address "Yalidine Alger Centre — 5 rue…" → admin badge. Real clicks on the
+  selects not exercised this time (pane hidden); the same `FormSelect` is used everywhere else. Test order, product
+  and both points deleted. typecheck, lint, 7 tests clean.
+
+### 2026-11-09 — Method switches, store address on the Boutique tab
+- User: the address belongs to the shop (Boutique tab), and each method should be a plain on/off. Migration
+  `method_flags`: `Settings.pickupAddress` → `storeAddress` (Boutique tab, textarea, optional), `pickupEnabled` and
+  `stopdeskEnabled` (Livraison tab, native checkboxes with a hidden `""` twin so `updateSettings`' `has` filter sees
+  the key when unchecked: `f.getAll(k).includes("on")`). `CartView` takes `pickup: boolean` + `storeAddress`; the
+  address line under the pickup tile shows only when set; the cart page passes `desks` only when `stopdeskEnabled`.
+  `checkout` refuses a method that was switched off meanwhile (same path as a fee change).
+  `prisma migrate dev` refused the column rename non-interactively (drop = "data loss", the column was empty), so the
+  migration SQL was generated with `migrate diff --from-schema-datasource --to-schema-datamodel --script` into a
+  hand-named folder, then applied with `migrate dev`; `migrate diff` is empty afterwards.
+- Verified (dev, DOM-driven): Boutique tab shows "Adresse de la boutique"; Livraison shows both checkboxes; pickup on →
+  DB `pickupEnabled true`, cart with an item shows the two tiles and no address line (address empty); pickup off →
+  DB `false` (the hidden twin keeps the key). Both flags left off, address empty. typecheck, lint, 7 tests clean.
+
+### 2026-11-09 — Settings hints as help icons
+- User: the long hint lines under the Réglages fields should be a help icon (hover on desktop, tap on phones).
+  `Help` (`components/admin/fields.tsx`): a `CircleHelp` button next to the label, tooltip `role="tooltip"` shown with
+  `group-hover` / `group-focus-within` (a tap gives the button hover or focus on phones; iOS keeps the hover state until
+  the next tap). Desktop: 16rem ink bubble below the icon; below `md`: a bar fixed at the bottom of the screen, so it
+  never overflows. `Field`'s `hint` now renders the icon; the two Livraison checkboxes use `Help` inline. The one
+  general line "Un champ laissé vide reprend le texte par défaut" stays as text. No dependency added.
+
+### 2026-11-10 — Yalidine API (via dzship), Réglages refactor, sticky admin sidebar
+- User attached `dzship-1.2.0.zip` ("this api of yalidine"): it is **not** Yalidine's API but DZBuild's free gateway
+  (`freeship.dzbuild.com`, MIT docs + clients, proprietary hosted service) in front of 99 Algerian couriers; the shop's
+  Yalidine API ID + token are sent with every call ("never stored"). Built on it as asked; plain `fetch`, no dependency
+  (the npm client is a thin wrapper). Migration `yalidine_api`: `Order.tracking` / `labelUrl`, `StopDesk.commune`,
+  `Settings.yalidineApiId` / `yalidineApiToken` / `yalidineFromWilaya`. See the Yalidine convention above.
+- Token field is `type="password"`, shown empty: empty = keep the stored one; clearing the API ID switches the
+  feature off. Keys live in the DB with the rest of Réglages (not env): the admin sets them without server access.
+- Verified (dev, user's own server on :3000, pane hidden → DOM-driven; `YALIDINE_COURIER=sandbox` in a temp `.env`
+  line): keys saved; test order (DB-created: hydration stalls in the hidden pane, so the cart can't be driven there)
+  with phone `0123` → toast "Yalidine a refusé le colis : Request validation failed — phone: String must contain at
+  least 9 character(s)", `tracking` back to `""`, button still there; phone fixed → `DZTEST-J8A0E4` on the order,
+  `?status=CONFIRMED&saved=1` kept, button gone (sandbox returns no label, so no "Étiquette" link). Test order deleted,
+  stock 0 → 1, keys cleared, env line removed. A real Yalidine key was not available: first real send should be
+  watched (commune spellings, `labelUrl`).
+- **Réglages refactor** (user: ambiguity, redundancy, loose text): 7 tabs → 5. Points relais moved into the Yalidine
+  (now Transporteur) tab (the keys form, then the points' add form + list; `/admin/settings/desks` deleted, `DESKS` redirects to
+  `?tab=yalidine`); "Stock faible" (one number, clashed with the sidebar's "Stock") moved into Boutique. The repeated
+  "Un champ laissé vide…" line (3 tabs) is now `settingsHint` on each FR/AR pair's first help icon; the desks,
+  categories and Yalidine intro paragraphs became help icons (`deskFeeHint`, `categoriesHint` on "Catégorie parente",
+  `yalidineHint` on "API ID"); the long "Texte « Livraison et retours » (fiches produit, pied de page)" label is
+  short + `shippingTextHint`. `desksHint` deleted. Verified: 5 tabs, no `p.text-mute` left on the tabs, 6 help icons
+  on Yalidine, a relay point added and deleted from the new tab.
+- **Any courier, not just Yalidine** (user): dzship's request is the same for its 99 couriers, only the `courier`
+  key and the credential field names differ. `lib/yalidine.ts` → `lib/courier.ts` + a static catalog `lib/couriers.ts`
+  (generated from `GET /v1/couriers`: key, name, platform, credentials; the generic "ecotrack" entry left out).
+  Migration `courier` (hand-generated with `migrate diff`, Prisma refuses column drops non-interactively):
+  `Settings.yalidine*` → `courier` / `courierKeys` (JSON) / `courierFromWilaya`, `Order.courier`, `StopDesk.yalidineId Int?`
+  → `deskId String`. Tab "Yalidine" → "Transporteur": courier picker (GET form, `autoSubmit`, platforms with several
+  networks grouped: YALIDINE, ECOTRACK), the picked courier's fields, origin wilaya (`required` for the Yalidine
+  family only), then the relay points. `YALIDINE_COURIER` env dropped: "Sandbox" is an entry of the picker. Strings
+  renamed (`sCourier`, `courierHint`, `sendCourier` "Envoyer à {courier}"…). typecheck, lint, 10 tests clean.
+  The user's own dev server kept the old Prisma client after the migration (500 "column Settings.yalidineApiId does
+  not exist"; stopping it from here was not allowed), the user stopped it and dev now runs from the preview pane.
+  Verified then (DOM-driven): picker Yalidine → `?courier=yalidine`, two password fields, wilaya `required`; save →
+  `courierKeys` `{"apiId":"test-id","apiToken":"test-token"}`, dots placeholders; empty re-save keeps the keys;
+  Sandbox → no fields, wilaya optional; order row "Envoyer à Sandbox (test courier)" → "Sandbox (test courier)
+  DZTEST-1HUWTD", `Order.courier = "sandbox"`; "— Aucun" saved → courier "", keys "". Found and fixed: the picker's
+  "none" item must not use value `""` (FormSelect shows an empty trigger for it) → sentinel `"none"`.
+  Test order deleted, stock back to 1, settings cleared.
+- **Yalidine's tariff and agencies as defaults** (user pasted both lists: 48 destinations with home / stop-desk /
+  return fees, 200 stop desks with ids). Kept as given in `prisma/yalidine-fees.csv` and `prisma/yalidine-desks.csv`
+  (copied to `/app/db` by the Dockerfile), parsed by `lib/defaults.ts` (`parseFees`, `parseDesks`, `wilayaFor`:
+  courier spellings → our "16 - Alger" values without accents / case; "El Menia" → El Meniaa; the 10 wilayas of 2019
+  take their former parent's tariff; a few desk addresses hold an unquoted comma → address = every column between Nom
+  and GPS). Migration `wilaya_fees`: new `WilayaFee { wilaya @id, home, desk }`, `Settings.deliveryFee` and
+  `StopDesk.fee` dropped (the fee is the wilaya's, not the point's). Seed fills each table only when empty (admin
+  edits survive restarts); the user's hand-typed test point "Yalidine Draria" was deleted so the 200 agencies could
+  seed. Réglages › Livraison: the flat fee field is gone, a 58-row table (home / relay inputs, `updateWilayaFees`
+  upserts all) sits under the short form; Transporteur: points folded per wilaya (55 folds), no fee column. Cart:
+  `fees[wilaya] = [home, desk]`, the fee line follows the wilaya; `checkout` reads `WilayaFee` by the destination.
+  "Tarif retour" and "Délai" columns are not used (no return accounting, no delay shown).
+- Verified (dev from the preview pane): seed → 58 tariffs (Alger 500 / 450, Timimoun 1450 / 1150 from Adrar), 200
+  points (Annaba row with the unquoted comma: "Champs de Mars Numéro N°3, Annaba", id 230102); Livraison table 58
+  rows, Alger 500 → 550 saved then restored; Transporteur 55 folds, Alger 26 points; cart with a planted item: Oran
+  → 850 DA, picking 16 - Alger in the select → 500 DA. typecheck, lint, 12 tests clean.
+- Then (user: "those fees are Yalidine's, not every courier's"): the seed no longer fills either table. The CSVs moved
+  to `data/` (read at runtime from `process.cwd()`, so they are in the image, not in the `/app/db` copy), and
+  `loadCourierDefaults` + a button on Transporteur, shown only when the **saved** courier's platform is `yalidine`,
+  loads them on demand (tariff rows replaced, agencies added by `deskId`, confirm first). A store on another courier
+  starts with an empty tariff (= free until typed) and no points. The local DB keeps the already loaded data.
+- **Admin sidebar** (user: had to scroll to reach "Voir la boutique" / logout): the aside stretched to the page height
+  with `md:mt-auto` pushing those links to its end. Now `md:sticky md:top-0 md:h-dvh md:overflow-y-auto`: 768px tall
+  in a 768px viewport, logout at 720px on an 855px page. Phones unchanged (`contents`).
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - **SEO, still missing** (simplest first): `metadataBase` from a new `SITE_URL` env var (needed by the rest);
@@ -795,32 +979,14 @@ Keep this section last; update it when something here gets done or newly found.
   category pages titled "Tous les produits" with the home description, no canonical, so every size/color/sort/q
   combo is a duplicate URL; default favicon. Arabic is invisible to search engines (locale is a cookie on the
   same URL): only `/ar/...` routes + `hreflang` would fix it.
-- **TODO (planned) — Working with Yalidine (delivery company).** Not decided how deep; options below.
-  **Step 0 — done 2026-10-14:** checkout = wilaya + **commune** (select, `lib/communes.ts`) + street address.
-  Still to check against Yalidine's own list: our wilaya spellings (e.g. "El M'Ghair", "Bordj Bou Arréridj") and
-  the CSV's commune spellings may differ from theirs; map them at export / API time, don't rename stored values.
-  Levels, lightest first (they stack):
-  1. **Tracking number only**: admin pastes the Yalidine tracking (`yal-…`) on the order after creating the
-     parcel in Yalidine's dashboard → shown in admin orders, can go in the WhatsApp message to the customer.
-     One `Order` field, no API.
-  2. **Export for Yalidine's bulk import** (recommended start, with 1): tick confirmed orders → "Exporter pour
-     Yalidine" → file in Yalidine's import format (name, phone, wilaya, commune, address, product list,
-     amount to collect) → admin uploads it in the Yalidine dashboard, which flags bad communes; tracking
-     pasted back with level 1. No keys, quotas or API errors; reuse `lib/csv.ts`. **Blocked on the user
-     sending Yalidine's import template** (from their dashboard): copy its columns exactly, don't guess.
-  3. **One-way API**: "Envoyer à Yalidine" on a confirmed order → `POST /parcels`, tracking + label URL kept
-     on `Order` (schema change). No status sync. Needs API keys and exact commune names.
-  4. **Full integration**: 3 plus `/deliveryfees` (per-wilaya fee instead of the flat one), `/centers`
-     (stop-desk option), `/histories` (sync statuses, e.g. "Livré" → `DELIVERED`). Only if volume grows.
-  API notes (2026-10-14, from unofficial clients; the official docs need a merchant login — verify there):
-  base `https://api.yalidine.app/v1/`, headers `X-API-ID` + `X-API-TOKEN` (server-side env vars only),
-  `POST /parcels` takes a JSON **array** and answers per `order_id` `{ success, tracking, label, message }`;
-  parcel fields: order_id, from_wilaya_name, firstname, familyname, contact_phone, address,
-  to_wilaya_name, to_commune_name, product_list, price (0–150000), do_insurance, declared_value,
-  length/width/height/weight, freeshipping, is_stopdesk (+ stopdesk_id), has_exchange (+ product_to_collect).
-  Quotas ≈ 5/s, 50/min, 1000/h, 10000/day (response headers `*-quota-left`). Statuses are French text.
-  References: github.com/tarek-berkane/yalidine (Python), github.com/feeefapp/yalidine (TS, `npm i yalidine`);
-  plain `fetch` is enough, no dependency needed.
+- **Courier integration** (done 2026-11-10 through dzship, see Conventions): one-way parcel creation + tracking.
+  Not done: status sync (`POST /v1/track` → `SHIPPED` / `DELIVERED` / `RETURNED`), per-wilaya delivery fee
+  (`POST /v1/rates`), relay points pulled from the courier (`POST /v1/desks`) instead of typed by hand, label
+  printing for couriers that return none, a second courier at the same time (one courier per shop today), going to a
+  courier's own API (Yalidine: `https://api.yalidine.app/v1/parcels`, headers `X-API-ID` / `X-API-TOKEN`, JSON array
+  of parcels) to stop sending credentials through a third party. Not verified against a real courier account yet
+  (only dzship's sandbox): first real send should be watched (commune spellings, `labelUrl`). Our wilaya / commune
+  spellings are mapped by the gateway per courier; never rename stored values.
 - `docker build` never run yet (Docker Desktop not initialized on the dev machine). The first build may need fixes.
 - Dashboard day buckets and the Commandes date filter follow the server's time zone (Dockerfile sets
   `TZ=Africa/Algiers`, untested). No "delivered on" date exists, so there is no revenue-over-time chart (only order value by
@@ -829,8 +995,12 @@ Keep this section last; update it when something here gets done or newly found.
 - Categories: no manual order (alphabetical), no category images (home tiles use the latest product's).
   On touch tablets (≥768px) the hover menu doesn't open: tapping a main category opens its page, whose
   sub-row lists the sub-categories.
-- Delivery fee is one flat amount (Réglages): no per-wilaya fee or stop-desk option (see the Yalidine TODO
-  above). Admin orders show the total only, not the fee part. Orders placed before communes have `commune = ""`
+- Delivery fee is per wilaya and method only (no per-commune, weight or free-shipping threshold); the tariff table is
+  edited by hand (no CSV import / export). Built-in tariff + agencies exist for Yalidine only (`data/yalidine-*.csv`,
+  a static copy from 2026-11: re-paste when Yalidine changes its grid); other couriers type theirs, or later pull them
+  through dzship's `POST /v1/rates` / `POST /v1/desks`. Relay points have no edit row (delete + re-add).
+  Admin Commandes can't filter by method (home / pickup / relay), and the "Expédiée" tab is also where "Prête en
+  boutique" pickup orders sit. Admin orders show the total only, not the fee part. Orders placed before communes have `commune = ""`
   (their commune is inside `address`). The commune select is a plain list with type-ahead (Tizi Ouzou: 67), no search box.
 - Store name is one value for both languages (FR/AR for tagline, hero title, delivery text only).
 - Product images: no main-image choice or ordering. No order detail page in admin.

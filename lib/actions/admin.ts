@@ -1,15 +1,19 @@
 "use server"
-import { unlink, writeFile } from "node:fs/promises"
+import { readFile, unlink, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { OrderStatus, Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { requireAdmin } from "@/auth"
 import { db } from "@/lib/db"
+import { isWilaya, WILAYAS, wilayaValue } from "@/lib/wilayas"
 import { decodeText, parseCsv, planImport, type ImportState } from "@/lib/csv"
 import { fill, getI18n, getSettings } from "@/lib/i18n"
 import { MIME, UPLOAD_DIR } from "@/lib/uploads"
 import { FINAL_STATUSES, makeSku, slugify, unique, UNSOLD_STATUSES } from "@/lib/utils"
+import { courierReady, createParcel, parcelFor, parseKeys } from "@/lib/courier"
+import { courierOf } from "@/lib/couriers"
+import { parseDesks, parseFees } from "@/lib/defaults"
 
 // Every action re-checks the role: proxy.ts guards pages, not direct action calls.
 
@@ -209,6 +213,62 @@ export async function deleteCategory(id: string) {
   redirect(`${CATS}?saved=1${parentId ? `&open=${parentId}` : ""}`)
 }
 
+const DESKS = "/admin/settings?tab=courier"
+
+// The courier's relay points, typed by the admin from its list; the fee is per point, as the courier bills it.
+export async function createStopDesk(f: FormData) {
+  await requireAdmin()
+  const wilaya = str(f, "wilaya")
+  const name = str(f, "name").slice(0, 60)
+  if (!isWilaya(wilaya) || !name) redirect(DESKS)
+  await db.stopDesk.create({ data: {
+    wilaya, name, address: str(f, "address").slice(0, 200),
+    commune: str(f, "commune").slice(0, 60), deskId: str(f, "deskId").slice(0, 40),
+  } })
+  done()
+  redirect(`${DESKS}&saved=1`)
+}
+
+// Delivery fee per wilaya (home / relay), one row per wilaya: the form posts home_<code> and desk_<code> for all 58.
+export async function updateWilayaFees(f: FormData) {
+  await requireAdmin()
+  await db.$transaction(WILAYAS.map((w) => {
+    const wilaya = wilayaValue(w)
+    const data = { home: int(f, `home_${w[0]}`), desk: int(f, `desk_${w[0]}`) }
+    return db.wilayaFee.upsert({ where: { wilaya }, create: { wilaya, ...data }, update: data })
+  }))
+  done()
+  redirect("/admin/settings?tab=delivery&saved=1")
+}
+
+// Yalidine's tariff + agencies (data/yalidine-*.csv), for a shop whose courier is Yalidine or a sister network:
+// the tariff replaces every wilaya's row, agencies not yet present (by deskId) are added. Other couriers: typed in.
+export async function loadCourierDefaults() {
+  await requireAdmin()
+  const s = await getSettings()
+  if (courierOf(s.courier)?.[2] !== "yalidine") redirect(DESKS)
+  const csv = (f: string) => readFile(path.join(process.cwd(), "data", f), "utf8")
+  const [fees, desks, have] = await Promise.all([
+    csv("yalidine-fees.csv").then(parseFees), csv("yalidine-desks.csv").then(parseDesks),
+    db.stopDesk.findMany({ select: { deskId: true } }),
+  ])
+  const known = new Set(have.map((d) => d.deskId))
+  await db.$transaction([
+    ...fees.map((f) => db.wilayaFee.upsert({ where: { wilaya: f.wilaya }, create: f, update: { home: f.home, desk: f.desk } })),
+    db.stopDesk.createMany({ data: desks.filter((d) => !known.has(d.deskId)) }),
+  ])
+  done()
+  redirect(`${DESKS}&saved=1`)
+}
+
+// Orders keep the point's name + address as text (stopDeskId → null), so deleting never loses delivery info.
+export async function deleteStopDesk(id: string) {
+  await requireAdmin()
+  await db.stopDesk.delete({ where: { id } })
+  done()
+  redirect(`${DESKS}&saved=1`)
+}
+
 const MAX_BYTES = 8 * 1024 * 1024
 
 // FormData file → buffer → public/uploads/<Date.now()>-<name> → its URL; null if not an accepted image.
@@ -252,7 +312,17 @@ export async function updateSettings(tab: string, f: FormData) {
   const back = `/admin/settings?${tab === "store" ? "" : `tab=${encodeURIComponent(tab)}&`}`
   const whatsapp = str(f, "whatsapp").replace(/\D/g, "")
   if (whatsapp && (whatsapp.length < 8 || whatsapp.length > 15)) redirect(`${back}error=badWhatsapp`)
+  const fromWilaya = str(f, "courierFromWilaya")
+  if (fromWilaya && !isWilaya(fromWilaya)) redirect(`${back}error=required`)
+  const courier = str(f, "courier")
+  if (f.has("courier") && courier && !courierOf(courier)) redirect(`${back}error=required`)
   const old = await getSettings()
+  // credentials: one password field per field the courier needs, shown empty: empty = keep the stored value
+  // (same courier only; another courier starts from nothing). "" courier = feature off, credentials dropped.
+  const kept = courier === old.courier ? parseKeys(old.courierKeys) : {}
+  const courierKeys = courier
+    ? JSON.stringify(Object.fromEntries((courierOf(courier)?.[3] ?? []).map((k) => [k, str(f, `cred_${k}`).slice(0, 200) || kept[k] || ""])))
+    : ""
   const file = f.get("heroImage")
   const heroImage = file instanceof File && file.size
     ? ((await saveUpload(file)) ?? redirect(`${back}error=badImage`))
@@ -262,9 +332,14 @@ export async function updateSettings(tab: string, f: FormData) {
     taglineFr: str(f, "taglineFr").slice(0, 120), taglineAr: str(f, "taglineAr").slice(0, 120),
     heroTitleFr: str(f, "heroTitleFr").slice(0, 60), heroTitleAr: str(f, "heroTitleAr").slice(0, 60),
     shippingTextFr: str(f, "shippingTextFr").slice(0, 500), shippingTextAr: str(f, "shippingTextAr").slice(0, 500),
-    heroImage, whatsapp, deliveryFee: int(f, "deliveryFee"), lowStock: int(f, "lowStock"),
+    heroImage, whatsapp, lowStock: int(f, "lowStock"),
+    storeAddress: str(f, "storeAddress").slice(0, 200),
+    // checkbox: a hidden "" twin keeps the key in the FormData when unchecked, so `has` still sees it
+    pickupEnabled: f.getAll("pickupEnabled").includes("on"),
+    stopdeskEnabled: f.getAll("stopdeskEnabled").includes("on"),
+    courier, courierKeys, courierFromWilaya: fromWilaya,
   }
-  const data: Partial<typeof all> = Object.fromEntries(Object.entries(all).filter(([k]) => f.has(k)))
+  const data: Partial<typeof all> = Object.fromEntries(Object.entries(all).filter(([k]) => f.has(k) || (k === "courierKeys" && f.has("courier"))))
   await db.settings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data })
   if (old.heroImage && old.heroImage !== heroImage) await removeFile({ url: old.heroImage })
   done()
@@ -294,6 +369,28 @@ export async function updateOrderStatus(orderId: string, back: string, f: FormDa
   })
   done()
   redirect(back)
+}
+
+// Creates the parcel on the shop's courier account (lib/courier.ts) and keeps courier + tracking + label on the
+// order. Not for pickup orders, final orders or one already sent. The status is left to the admin (SHIPPED once collected).
+export async function sendToCourier(orderId: string, back: string) {
+  await requireAdmin()
+  if (!back.startsWith("/admin/orders")) back = "/admin/orders"
+  const fail = (k: string, detail = "") =>
+    redirect(`${back}${back.includes("?") ? "&" : "?"}error=${k}${detail ? `&detail=${encodeURIComponent(detail.slice(0, 300))}` : ""}`)
+  const s = await getSettings()
+  if (!courierReady(s)) fail("courierSetup")
+  const o = await db.order.findUnique({ where: { id: orderId }, include: { items: { include: { variant: { include: { product: true } } } }, stopDesk: true } })
+  if (!o || o.method === "PICKUP" || FINAL_STATUSES.includes(o.status)) redirect(back)
+  if (o.method === "STOPDESK" && !o.stopDesk?.commune) fail("courierDesk")
+  // claim the order first: a double click must not create two parcels. "…" is cleared again on failure.
+  const { count } = await db.order.updateMany({ where: { id: orderId, tracking: "" }, data: { tracking: "…" } })
+  if (!count) redirect(back)
+  const res = await createParcel(parcelFor(o), s)
+  await db.order.update({ where: { id: orderId }, data: res.ok ? { courier: s.courier, tracking: res.tracking, labelUrl: res.labelUrl } : { tracking: "" } })
+  done()
+  if (!res.ok) fail("courierRefused", res.message)
+  redirect(`${back}${back.includes("?") ? "&" : "?"}saved=1`)
 }
 
 // Any status, final ones too (e.g. why a parcel came back). Same `back` rule as the status.

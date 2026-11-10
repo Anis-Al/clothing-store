@@ -16,6 +16,12 @@ enum Role {
 // Cash on delivery: PENDING → CONFIRMED (customer called) → SHIPPED → DELIVERED (cash received).
 // RETURNED (parcel refused or not collected, back in the shop; only after SHIPPED) and CANCELLED put
 // the items back in stock. Declaration order = order shown in the admin.
+enum DeliveryMethod {
+  HOME // courier to the customer's address, flat fee
+  PICKUP // collected at the shop: no address, no fee
+  STOPDESK // Yalidine relay point (StopDesk row): fee of that point, address = the point's
+}
+
 enum OrderStatus {
   PENDING
   CONFIRMED
@@ -86,6 +92,9 @@ model Order {
   userId      String? // null = guest order (customers have no accounts)
   user        User?       @relation(fields: [userId], references: [id])
   status      OrderStatus @default(PENDING)
+  method      DeliveryMethod @default(HOME)
+  stopDeskId  String? // STOPDESK orders: the point picked (kept for a Yalidine export; its text is copied into address)
+  stopDesk    StopDesk?   @relation(fields: [stopDeskId], references: [id], onDelete: SetNull)
   totalAmount Int // items + shippingFee: what the courier collects
   shippingFee Int         @default(0) // flat fee from Réglages at checkout time
   // delivery (cash on delivery); defaults only so pre-existing rows migrate
@@ -95,11 +104,35 @@ model Order {
   commune     String      @default("") // Latin name from lib/communes.ts; "" on orders placed before communes
   address     String      @default("") // street, n°, district (before communes: commune included)
   note        String      @default("") // admin only: call outcome, call back at…, customer's request
+  courier     String      @default("") // courier key (lib/couriers.ts) the parcel was created with, "" = not sent
+  tracking    String      @default("") // the courier's tracking number once the parcel is created from the admin
+  labelUrl    String      @default("") // printable label link returned at creation (Yalidine family, Ecotrack)
   createdAt   DateTime    @default(now())
   items       OrderItem[]
 }
 
 // Réglages (admin): a single row, id 1, inserted by its migration. Empty text = the default from lib/dict.
+// The courier's stop-desk (relay) points, managed in Réglages › Transporteur (seeded with Yalidine's agencies).
+// commune (+ deskId for couriers that route by desk id: Yalidine family, NOEST…) is what the API needs to send a
+// parcel there. The fee is per wilaya (WilayaFee.desk), not per point.
+model StopDesk {
+  id      String  @id @default(cuid())
+  wilaya  String // "16 - Alger", as in Order.wilaya
+  name    String
+  commune String  @default("") // the courier's French spelling
+  address String  @default("")
+  deskId  String  @default("") // the point's id in the courier's own system
+  orders  Order[]
+}
+
+// Delivery fee per destination wilaya and method, in DZD (Réglages › Livraison; seeded with Yalidine's tariff,
+// one row per wilaya). Read by checkout (never from the client) and shown in the cart as the wilaya changes.
+model WilayaFee {
+  wilaya String @id // "16 - Alger"
+  home   Int // courier to the door
+  desk   Int // collected at a relay point
+}
+
 model Settings {
   id             Int    @id // always 1
   storeName      String @default("")
@@ -111,8 +144,16 @@ model Settings {
   shippingTextFr String @default("")
   shippingTextAr String @default("")
   whatsapp       String @default("") // digits, international format; "" hides the button
-  deliveryFee    Int    @default(0) // DZD, flat, every wilaya; 0 = free
+  storeAddress   String @default("") // Boutique tab: street, district, hours; shown to a customer picking up
+  pickupEnabled  Boolean @default(false) // Livraison tab: offer "Retrait en boutique" at checkout
+  stopdeskEnabled Boolean @default(false) // Livraison tab: offer "Point relais" (needs StopDesk rows too)
   lowStock       Int    @default(3) // "Stock faible" at or below this
+  // Transporteur tab: the delivery company (key from lib/couriers.ts), its credentials as a JSON object of the fields
+  // that courier needs, origin wilaya ("16 - Alger"; required by the Yalidine family). courierReady() = the
+  // "Envoyer à …" button appears on orders.
+  courier           String @default("")
+  courierKeys       String @default("")
+  courierFromWilaya String @default("")
 }
 
 model OrderItem {

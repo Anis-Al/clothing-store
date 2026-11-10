@@ -5,13 +5,16 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { NoteInput } from "@/components/admin/client"
+import { ConfirmButton, NoteInput } from "@/components/admin/client"
 import { FiltersPill, Notice, Pager } from "@/components/admin/fields"
 import { FormSelect } from "@/components/form-select"
+import { buttonVariants } from "@/components/ui/button"
 import { WhatsAppIcon } from "@/components/whatsapp-icon"
-import { updateOrderNote, updateOrderStatus } from "@/lib/actions/admin"
+import { sendToCourier, updateOrderNote, updateOrderStatus } from "@/lib/actions/admin"
+import { courierReady } from "@/lib/courier"
+import { courierOf } from "@/lib/couriers"
 import { db } from "@/lib/db"
-import { formatDate, formatPrice, getI18n } from "@/lib/i18n"
+import { fill, formatDate, formatPrice, getI18n, getSettings } from "@/lib/i18n"
 import { cn, FINAL_STATUSES, listParams, paginate } from "@/lib/utils"
 
 const STATUSES = Object.values(OrderStatus) // schema order: the COD flow
@@ -46,11 +49,14 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
     ...((from || to) && { createdAt: { ...(from && { gte: dayStart(from) }), ...(to && { lt: dayStart(to, 1) }) } }),
   }
   const where = { ...base, ...(status && { status }) }
-  const [{ t, locale }, total, counts] = await Promise.all([
+  const [{ t, locale }, settings, total, counts] = await Promise.all([
     getI18n(),
+    getSettings(),
     db.order.count({ where }),
     db.order.groupBy({ by: ["status"], where: base, _count: true }), // tab counts follow search + dates
   ])
+  // "Envoyer à <courier>" once Réglages › Transporteur is complete
+  const courier = courierReady(settings) ? courierOf(settings.courier)?.[1] : undefined
   const { page, pages, skip, take } = paginate(total, asked, PER_PAGE)
   const orders = await db.order.findMany({
     where, skip, take,
@@ -146,7 +152,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
               <TableCell className="font-mono text-xs" dir="ltr">{o.id.slice(-8).toUpperCase()}</TableCell>
               <TableCell>{formatDate(o.createdAt, locale)}</TableCell>
               <TableCell className="min-w-48 whitespace-normal text-sm max-md:basis-full">
-                {o.wilaya ? (
+                {o.fullName ? (
                   <>
                     <p className="font-medium">{o.fullName}</p>
                     <p className="flex items-center gap-2">
@@ -156,8 +162,29 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                         <WhatsAppIcon className="size-5 text-[#25D366]" />
                       </a>
                     </p>
-                    <p>{o.commune && `${o.commune}, `}{o.wilaya}</p>
-                    <p className="text-mute">{o.address}</p>
+                    {o.method === "PICKUP" ? (
+                      <Badge variant="secondary" className="mt-1">{t.admin.pickup}</Badge>
+                    ) : (
+                      <>
+                        {o.method === "STOPDESK" && <Badge variant="secondary" className="my-1">{t.admin.stopdesk}</Badge>}
+                        <p>{o.commune && `${o.commune}, `}{o.wilaya}</p>
+                        <p className="text-mute">{o.address}</p>
+                        {/* parcel created at the courier: its name, tracking, label. Else the button, once a courier is set up */}
+                        {o.tracking ? (
+                          <p className="mt-1 flex flex-wrap items-center gap-x-2">
+                            <span className="text-mute">{courierOf(o.courier)?.[1] ?? o.courier}</span>
+                            <span className="font-mono text-xs" dir="ltr">{o.tracking}</span>
+                            {o.labelUrl && <a href={o.labelUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">{t.admin.label}</a>}
+                          </p>
+                        ) : courier && !FINAL_STATUSES.includes(o.status) && (
+                          <form action={sendToCourier.bind(null, o.id, href({ page }))} className="mt-2">
+                            <ConfirmButton message={fill(t.admin.confirmCourier, { courier })} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                              {fill(t.admin.sendCourier, { courier })}
+                            </ConfirmButton>
+                          </form>
+                        )}
+                      </>
+                    )}
                   </>
                 ) : <p>—</p>}
                 {/* the call's outcome, typed right after calling from the link above. Reads as text; a dashed
@@ -185,7 +212,9 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                       confirm={{ values: FINAL_STATUSES, message: t.admin.confirmFinal }}
                       className={cn("w-40", o.status === "PENDING" && "font-medium")}
                       // only a shipped parcel can come back (the action checks it too)
-                      items={STATUSES.filter((s) => s !== "RETURNED" || o.status === "SHIPPED").map((s) => ({ value: s, label: t.status[s] }))} />
+                      items={STATUSES.filter((s) => s !== "RETURNED" || o.status === "SHIPPED").map((s) => ({
+                        // a pickup order isn't shipped: "Expédiée" reads as "ready at the shop" (same state, same stock rules)
+                        value: s, label: s === "SHIPPED" && o.method === "PICKUP" ? t.admin.readyPickup : t.status[s] }))} />
                   </form>
                 )}
               </TableCell>
