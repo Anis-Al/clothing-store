@@ -1,6 +1,7 @@
 "use client"
 // Tiny client helpers for otherwise server-rendered admin forms.
 import { createContext, useActionState, useContext, useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Check, ChevronDown, Copy, MoreHorizontal, X } from "lucide-react"
@@ -18,21 +19,39 @@ export function NoteInput(props: React.ComponentProps<"input">) {
   return <input {...props} onBlur={(e) => { if (e.target.value !== e.target.defaultValue) e.target.form?.requestSubmit() }} />
 }
 
-// "⋯" menu: a native <details> whose panel holds server-rendered buttons (e.g. other status changes). Closes on a
-// click outside it or on Escape; a submit inside redirects, which remounts the page anyway.
+// "⋯" menu: a native <details> whose panel holds server-rendered buttons or links. The panel is portalled to <body>
+// and fixed under the trigger, so a scrolling / clipping ancestor (the Commandes table) can't cut it; it closes on a
+// click outside, Escape, any scroll, or a link click (soft navigation keeps the DOM). Submit buttons inside must name
+// their form (`form="<id>"`): the portal takes them out of it in the DOM.
 export function MoreMenu({ label, children, triggerClassName, trigger }: {
   label: string; children: React.ReactNode; triggerClassName?: string; trigger?: React.ReactNode
 }) {
   const ref = useRef<HTMLDetailsElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; side: "left" | "right"; at: number } | null>(null) // null = closed
+  const close = () => { if (ref.current?.open) ref.current.open = false }
   useEffect(() => {
-    const close = (e: Event) => { const d = ref.current; if (d?.open && !d.contains(e.target as Node)) d.open = false }
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && ref.current?.open) ref.current.open = false }
-    document.addEventListener("pointerdown", close)
+    const out = (e: Event) => { const n = e.target as Node; if (!ref.current?.contains(n) && !panel.current?.contains(n)) close() }
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") close() }
+    document.addEventListener("pointerdown", out)
     document.addEventListener("keydown", esc)
-    return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", esc) }
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("resize", close)
+    return () => {
+      document.removeEventListener("pointerdown", out); document.removeEventListener("keydown", esc)
+      window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close)
+    }
   }, [])
+  // the panel hangs from the trigger's end edge (right in LTR, left in RTL)
+  const onToggle = () => {
+    const d = ref.current
+    if (!d?.open) return setPos(null)
+    const r = d.querySelector("summary")!.getBoundingClientRect()
+    const rtl = getComputedStyle(d).direction === "rtl"
+    setPos({ top: r.bottom + 4, side: rtl ? "left" : "right", at: rtl ? r.left : window.innerWidth - r.right })
+  }
   return (
-    <details ref={ref} className="relative">
+    <details ref={ref} onToggle={onToggle}>
       {/* default: a round "⋯" button; `trigger` replaces its content (and its look comes from triggerClassName) */}
       <summary aria-label={trigger ? undefined : label} title={trigger ? undefined : label}
         className={cn("cursor-pointer list-none [&::-webkit-details-marker]:hidden",
@@ -40,9 +59,14 @@ export function MoreMenu({ label, children, triggerClassName, trigger }: {
           triggerClassName ?? "border border-hairline hover:border-ink")}>
         {trigger ?? <MoreHorizontal className="size-4" />}
       </summary>
-      {/* a link inside navigates softly (the DOM stays): close the menu on the click */}
-      <div onClick={(e) => { if ((e.target as Element).closest("a") && ref.current) ref.current.open = false }}
-        className="absolute end-0 top-full z-40 mt-1 flex min-w-52 flex-col rounded-[18px] bg-canvas p-1.5 text-ink ring-1 ring-hairline">{children}</div>
+      {pos && createPortal(
+        <div ref={panel} onClick={(e) => { if ((e.target as Element).closest("a")) close() }}
+          style={{ top: pos.top, [pos.side]: pos.at }}
+          className="fixed z-50 flex min-w-52 flex-col rounded-[18px] bg-canvas p-1.5 text-ink ring-1 ring-hairline">
+          {children}
+        </div>,
+        document.body,
+      )}
     </details>
   )
 }

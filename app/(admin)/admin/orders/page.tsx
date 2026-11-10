@@ -21,8 +21,8 @@ const STATUSES = Object.values(OrderStatus) // schema order: the COD flow
 // the two dead ends, rare and never acted on: folded under "Plus" in the desktop tab strip
 const RARE: OrderStatus[] = ["RETURNED", "CANCELLED"]
 const METHODS = Object.values(DeliveryMethod)
-const PER_PAGE = 8 // table rows (desktop)
-const PER_PAGE_PHONE = 5 // cards
+const PER_PAGE = 6 // table rows (desktop; user's call)
+const PER_PAGE_PHONE = 2 // cards (user's call)
 // ?sort=<column>-<asc|desc>, none = newest first. Wilaya sorts as text ("16 - Alger"): it groups a wilaya's parcels,
 // codes aren't in numeric order. Status isn't a sort: the tabs filter it.
 const SORTS = { date: "createdAt", wilaya: "wilaya", total: "totalAmount" } as const
@@ -277,11 +277,13 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                 const courierName = courierOf(o.courier)?.[1] ?? o.courier
                 const courierState = o.courierStatus && (o.courierStatus === "unknown" && o.courierRaw ? o.courierRaw : (t.courierStatus[o.courierStatus] ?? o.courierStatus))
                 const mine = courier && !final && o.courier === settings.courier
-                // a submit button posts its own name/value: status=<target>
+                // a submit button posts its own name/value: status=<target>. The ⋯ menu's buttons are portalled out of
+                // the form, so every step button names it (`form`).
+                const formId = `status-${o.id}`
                 const step = (st: Step, cls: string) => FINAL_STATUSES.includes(st.to) ? (
-                  <ConfirmButton key={st.to} name="status" value={st.to} message={t.admin.confirmFinal} className={cls}>{st.label}</ConfirmButton>
+                  <ConfirmButton key={st.to} form={formId} name="status" value={st.to} message={t.admin.confirmFinal} className={cls}>{st.label}</ConfirmButton>
                 ) : (
-                  <button key={st.to} type="submit" name="status" value={st.to} className={cls}>{st.label}</button>
+                  <button key={st.to} form={formId} type="submit" name="status" value={st.to} className={cls}>{st.label}</button>
                 )
                 const refresh = (withText: boolean) => mine && o.tracking && (
                   <form action={trackOrder.bind(null, o.id, href({ page }))} className="contents">
@@ -447,7 +449,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                       </div>
 
                       {/* next step + ⋯ + details */}
-                      <form action={updateOrderStatus.bind(null, o.id, href({ page }))} className="flex items-center gap-2 lg:col-start-6 lg:justify-end">
+                      <form id={formId} action={updateOrderStatus.bind(null, o.id, href({ page }))} className="flex items-center gap-2 lg:col-start-6 lg:justify-end">
                         {next ? step(next, cn(buttonVariants({ size: "sm" }), "h-10 flex-1 lg:h-9 lg:flex-none")) : <span className="flex-1 lg:hidden" />}
                         {more.length > 0 && (
                           <MoreMenu label={t.admin.moreActions} triggerClassName="border border-hairline hover:border-ink max-lg:size-10 max-lg:rounded-xl">

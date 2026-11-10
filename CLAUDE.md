@@ -65,8 +65,10 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   and every button leading to a final status asks first (`ConfirmButton`, `t.admin.confirmFinal`).
   Status changes are **next-step buttons** (`stepsOf()` in the orders page): one main button for the usual next step
   (Confirmer → Expédier / Marquer prête → Marquer livrée / retirée), the rest in a "⋯" menu (`MoreMenu`, native
-  `<details>`, closes on outside click / Escape): back one step, Colis retourné / Jamais retirée, Annuler. Each is a
-  submit button posting `status=<target>` to `updateOrderStatus`. No status dropdown any more.
+  `<details>`; its panel is portalled to `<body>` and fixed under the trigger so the table's overflow can't clip it;
+  closes on outside click / Escape / scroll / a link click): back one step, Colis retourné / Jamais retirée, Annuler.
+  Each is a submit button posting `status=<target>` to `updateOrderStatus`, with `form="status-<id>"` since the portal
+  takes it out of the form in the DOM. No status dropdown any more.
   Stock is taken at checkout and given back once on cancel or return (`UNSOLD_STATUSES`) — only through
   `updateOrderStatus`. Revenue counts `DELIVERED` only; charts and best sellers leave `UNSOLD_STATUSES` out.
 - **Writes** are Server Actions (`lib/actions/*`). Every admin action calls `requireAdmin()` itself;
@@ -75,18 +77,18 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   shows it as a bottom-end toast. Keep the page's own params in that redirect (settings `tab`, list
   filters, orders `back`, categories `open`), or the admin lands somewhere else after each save.
 - **Commandes URL** (`/admin/orders`): `status`, `method` (`HOME|PICKUP|STOPDESK`), `q`, `sort` (`date|wilaya|total` +
-  `-asc|-desc`, none = newest first; picked from a select, "date-desc" = none), `from` / `to` (YYYY-MM-DD), `page` (8 rows per page, 5 cards on phones: `PER_PAGE` / `PER_PAGE_PHONE`).
+  `-asc|-desc`, none = newest first; picked from a select, "date-desc" = none), `from` / `to` (YYYY-MM-DD), `page` (6 rows per page, 2 cards on phones: `PER_PAGE` / `PER_PAGE_PHONE`, user's call).
   Every tab, pager link and every `back` passed to the status / note / courier actions comes from `href(patch)` in the
   page; the GET forms carry the rest with `keep(...)`. A new param goes into `cur` there, or saves and tab switches drop it.
   Layout (from the 2026-11-10 mockup): status tab strip, then search · period segments (Tout / Aujourd'hui / 7 j / 30 j /
   Personnalisé… = the two date fields in a popover) · method · sort, then a bordered **table** from `lg` (`cols` in the
   page: Commande = status chip + ref + date · Client = name, phone + WhatsApp, note line · Livraison = method · place,
   courier state chip + parcel number · Articles · Total + "dont livraison" · Actions = next-step button, ⋯, chevron),
-  8 per page, and the same rows as **cards** below `lg` (5 per page, phone sniffed from the headers like Stock). The
+  6 per page, and the same rows as **cards** below `lg` (2 per page, phone sniffed from the headers like Stock). The
   chevron (`RowToggle`, context from `OrderRow` in `components/admin/client.tsx`) opens a details panel under the row:
   Livraison (address, courier, parcel number + `CopyButton` + refresh, 4-step timeline), Articles (itemised, sous-total /
   livraison / total), Note (`NoteInput`). The status chip is solid in its colour with an icon (`StatusChip`); tabs keep the
-  bare `TONE` dot. Footer: "1–8 sur 16" + `Pager`. Not built from the mockup: checkboxes / bulk actions, Exporter, Imprimer,
+  bare `TONE` dot. Footer: "1–6 sur 16" + `Pager`. Not built from the mockup: checkboxes / bulk actions, Exporter, Imprimer,
   "Action requise", the history log (no data behind them).
 - **Images**: every upload goes through `saveUpload()` (`lib/actions/admin.ts`: jpg/png/webp/avif/gif,
   ≤ 8 MB, no SVG) into `public/uploads/` (created at boot by `instrumentation.ts`), URL
@@ -1423,6 +1425,12 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   "Action requise", Signaler un incident, the per-step dates and history (only `createdAt` exists).
 - Verified in the pane: 1440 and 1280 (rows 89–97px, no inner scroll, total and button 23px apart), panel open
   (Livraison / Articles / Note), 375 cards 243px + the stacked panel, Arabic 1280 mirrored. typecheck, lint, tests clean.
+
+- ⋯ menu clipped by the table (user): `MoreMenu`'s panel now renders through `createPortal` into `<body>`, `position:
+  fixed` under the trigger's end edge (right in LTR, left in RTL), measured on toggle; closes on scroll / resize too.
+  Its submit buttons name their form (`form` attribute) since they're no longer inside it. Checked: panel in `<body>`,
+  fully visible, 4px under the trigger, buttons bound to the right form, outside click closes it; RTL aligned on the
+  left edge; phone card too. Pagination (user): 6 rows on desktop, 2 cards on phones.
 
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
