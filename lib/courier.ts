@@ -26,7 +26,10 @@ export type OrderToSend = Order & { items: (OrderItem & { variant: ProductVarian
 // dzship's order body. Wilaya code = the first two digits of the stored "16 - Alger"; commune names come from the
 // checkout's list (the gateway maps spellings per courier). A relay order routes by the point's commune, plus the
 // courier's own desk id where it has one (Yalidine, NOEST…; Ecotrack / Maystro go by the commune alone).
-export function parcelFor(o: OrderToSend) {
+// Shop-wide parcel options (Réglages › Livraison, debug): open before paying, insure at the order total, a fixed weight.
+export type ParcelOptions = { parcelOpenable?: boolean; parcelInsured?: boolean; parcelWeightKg?: number }
+
+export function parcelFor(o: OrderToSend, opts: ParcelOptions = {}) {
   const stop = o.method === "STOPDESK"
   return {
     reference: o.id.slice(-8).toUpperCase(), // the ref shown in the admin and on /merci
@@ -44,6 +47,9 @@ export function parcelFor(o: OrderToSend) {
     // courier from adding its own fee on top: the shop pays it out of codAmount.
     codAmount: o.totalAmount,
     freeShipping: true,
+    ...(opts.parcelOpenable && { hasOpenPackage: true }),
+    ...(opts.parcelInsured && { declaredValue: o.totalAmount }),
+    ...(opts.parcelWeightKg && opts.parcelWeightKg > 0 && { weightKg: opts.parcelWeightKg }),
   }
 }
 

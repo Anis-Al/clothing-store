@@ -335,6 +335,14 @@ export async function updateSettings(tab: string, f: FormData) {
   const storeCommune = isCommune(storeWilaya, str(f, "storeCommune")) ? str(f, "storeCommune") : "" // must belong to the wilaya
   const courier = str(f, "courier")
   if (f.has("courier") && courier && !courierOf(courier)) redirect(`${back}error=required`)
+  // "36.7538, 3.0588" as Google Maps copies it (also "36.7538,3.0588", "36.7538 3.0588"); commas are decimal marks only
+  // when there's no dot at all ("36,7538 ; 3,0588"). Empty = no map.
+  const rawCoords = str(f, "storeCoords")
+  const coords = (rawCoords.includes(".") ? rawCoords : rawCoords.replace(/(\d),(\d)/g, "$1.$2"))
+    .split(/[\s,;]+/).filter(Boolean).map(Number)
+  if (rawCoords && (coords.length !== 2 || coords.some(Number.isNaN) || Math.abs(coords[0]) > 90 || Math.abs(coords[1]) > 180))
+    redirect(`${back}error=badCoords`)
+  const weight = Number(str(f, "parcelWeightKg").replace(",", ".")) || 0
   // the three method checkboxes post together: the shop must keep at least one way to receive an order
   const on = (k: string) => f.getAll(k).includes("on")
   if (f.has("homeEnabled") && !on("homeEnabled") && !on("pickupEnabled") && !on("stopdeskEnabled")) redirect(`${back}error=noMethod`)
@@ -352,6 +360,7 @@ export async function updateSettings(tab: string, f: FormData) {
   const all = {
     storeName: str(f, "storeName").slice(0, 40),
     taglineFr: str(f, "taglineFr").slice(0, 120), taglineAr: str(f, "taglineAr").slice(0, 120),
+    storeHoursFr: str(f, "storeHoursFr").slice(0, 120), storeHoursAr: str(f, "storeHoursAr").slice(0, 120),
     heroTitleFr: str(f, "heroTitleFr").slice(0, 60), heroTitleAr: str(f, "heroTitleAr").slice(0, 60),
     shippingTextFr: str(f, "shippingTextFr").slice(0, 500), shippingTextAr: str(f, "shippingTextAr").slice(0, 500),
     heroImage, whatsapp, lowStock: int(f, "lowStock"),
@@ -359,8 +368,12 @@ export async function updateSettings(tab: string, f: FormData) {
     // checkbox: a hidden "" twin keeps the key in the FormData when unchecked, so `has` still sees it
     homeEnabled: on("homeEnabled"), pickupEnabled: on("pickupEnabled"), stopdeskEnabled: on("stopdeskEnabled"),
     courier, courierKeys, courierFromWilaya: fromWilaya,
+    parcelOpenable: on("parcelOpenable"), parcelInsured: on("parcelInsured"),
+    parcelWeightKg: Math.min(Math.max(Math.round(weight * 10) / 10, 0), 30),
+    storeLat: coords.length === 2 ? coords[0] : null, storeLng: coords.length === 2 ? coords[1] : null,
   }
-  const data: Partial<typeof all> = Object.fromEntries(Object.entries(all).filter(([k]) => f.has(k) || (k === "courierKeys" && f.has("courier"))))
+  const data: Partial<typeof all> = Object.fromEntries(Object.entries(all).filter(([k]) =>
+    f.has(k) || (k === "courierKeys" && f.has("courier")) || ((k === "storeLat" || k === "storeLng") && f.has("storeCoords"))))
   await db.settings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data })
   if (old.heroImage && old.heroImage !== heroImage) await removeFile({ url: old.heroImage })
   done()
@@ -399,7 +412,7 @@ export async function sendToCourier(orderId: string, back: string) {
   // claim the order first: a double click must not create two parcels. "…" is cleared again on failure.
   const { count } = await db.order.updateMany({ where: { id: orderId, tracking: "" }, data: { tracking: "…" } })
   if (!count) redirect(back)
-  const res = await createParcel(parcelFor(o), s)
+  const res = await createParcel(parcelFor(o, s), s)
   await db.order.update({ where: { id: orderId }, data: res.ok ? { courier: s.courier, tracking: res.tracking, labelUrl: res.labelUrl } : { tracking: "" } })
   done()
   if (!res.ok) fail("courierRefused", res.message)

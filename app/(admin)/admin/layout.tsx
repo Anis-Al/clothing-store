@@ -24,7 +24,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const item = "flex h-10 w-full items-center rounded-xl px-3 text-start text-sm hover:bg-cloud md:h-auto md:w-auto md:rounded-none md:p-0 md:text-stone md:hover:bg-transparent md:hover:text-canvas"
   const extras = (
     <>
-      <Link href="/" className={item}>{t.admin.backToStore}</Link>
+      {/* the shop in a new tab: the admin page stays open behind it */}
+      <a href="/" target="_blank" rel="noopener" className={item}>{t.admin.backToStore}</a>
       <form action={setLocale.bind(null, locale === "ar" ? "fr" : "ar")} className="contents">
         <button type="submit" className={item}>{locale === "ar" ? "Français" : "العربية"}</button>
       </form>

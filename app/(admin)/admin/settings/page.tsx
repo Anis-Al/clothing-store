@@ -15,7 +15,7 @@ import { DICTS, fill, getI18n, getSettings, type Dict } from "@/lib/i18n"
 import { DESK_PAGE, paginate } from "@/lib/utils"
 import { WILAYAS, wilayaValue } from "@/lib/wilayas"
 
-type TextKey = "taglineFr" | "taglineAr" | "heroTitleFr" | "heroTitleAr" | "shippingTextFr" | "shippingTextAr"
+type TextKey = "taglineFr" | "taglineAr" | "heroTitleFr" | "heroTitleAr" | "shippingTextFr" | "shippingTextAr" | "storeHoursFr" | "storeHoursAr"
 // credential field names as the couriers' dashboards print them (same in FR and AR)
 const CRED_LABELS: Record<string, string> = { apiId: "API ID", apiToken: "API token", apiKey: "API key", apiSecret: "API secret", token: "Token", key: "Key", guid: "GUID", tenantId: "Tenant ID", publicKey: "Public key" }
 const FEE_PAGE = 10 // tariff rows per page (the form posts and saves only the page shown)
@@ -73,7 +73,7 @@ export default async function Settings({ searchParams }: PageProps<"/admin/setti
   }
   // One field per language, side by side. Empty = the built-in text, shown as the placeholder (said once, as a help icon).
   // hint: text = that hint + "empty = default"; undefined = "empty = default" alone; null = no icon
-  const pair = (label: string, key: "tagline" | "heroTitle" | "shippingText", def: (d: Dict) => string, max: number, hint?: string | null, long = false) => (
+  const pair = (label: string, key: "tagline" | "heroTitle" | "shippingText" | "storeHours", def: (d: Dict) => string, max: number, hint?: string | null, long = false) => (
     <div className={cn("grid gap-4", !long && "md:grid-cols-2")}>
       {(["fr", "ar"] as const).map((l, i) => {
         const name: TextKey = `${key}${l === "fr" ? "Fr" : "Ar"}`
@@ -138,6 +138,14 @@ export default async function Settings({ searchParams }: PageProps<"/admin/setti
                 <Field label={t.admin.storeAddress} hint={t.admin.storeAddressHint}>
                   <Input name="storeAddress" maxLength={200} defaultValue={s.storeAddress} />
                 </Field>
+                {/* its own field (was mixed into the address): shown under the address on the home page and at pickup */}
+                {pair(t.admin.storeHours, "storeHours", (d) => d.admin.storeHoursPlaceholder, 120, null)}
+                <div className="max-w-sm">
+                  <Field label={t.admin.storeCoords} hint={t.admin.storeCoordsHint}>
+                    <Input name="storeCoords" dir="ltr" maxLength={60} placeholder="36.7538, 3.0588"
+                      defaultValue={s.storeLat != null && s.storeLng != null ? `${s.storeLat}, ${s.storeLng}` : ""} />
+                  </Field>
+                </div>
                 {/* debug only; not posted otherwise, so the saved threshold stays */}
                 {debug && (
                   <div className="max-w-xs">
@@ -190,6 +198,20 @@ export default async function Settings({ searchParams }: PageProps<"/admin/setti
                       <FormSelect name="courierFromWilaya" placeholder={t.cart.chooseWilaya} defaultValue={s.courierFromWilaya} items={wItems}
                         required={courier[2] === "yalidine"} />
                     </Field>
+                    {/* sent with every parcel (lib/courier.ts parcelFor); checkboxes need their hidden "" twin */}
+                    <div className="flex flex-col gap-3">
+                      <p className="text-sm font-medium">{t.admin.parcelOptions}</p>
+                      {(["parcelOpenable", "parcelInsured"] as const).map((k) => (
+                        <label key={k} className="flex items-start gap-3 text-sm">
+                          <input type="hidden" name={k} value="" />
+                          <input type="checkbox" name={k} value="on" defaultChecked={s[k]} className="mt-0.5 size-5 shrink-0 accent-ink" />
+                          {t.admin[k]}
+                        </label>
+                      ))}
+                      <Field label={t.admin.parcelWeight} hint={t.admin.parcelWeightHint}>
+                        <Input name="parcelWeightKg" type="number" min={0} max={30} step={0.1} dir="ltr" defaultValue={s.parcelWeightKg} className="w-28" />
+                      </Field>
+                    </div>
                   </div>
                 )}
                 {/* checkboxes: the hidden "" twin keeps the key in the FormData when unchecked (updateSettings filters on `has`) */}

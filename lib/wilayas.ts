@@ -30,3 +30,10 @@ export function normalizePhone(raw: string) {
   const m = raw.replace(/[\s.-]/g, "").match(/^(?:\+213|00213|0)([567]\d{8})$/)
   return m ? `0${m[1]}` : null
 }
+
+// The shop's address as one line in the UI language: "street, commune, wilaya" (each part optional).
+export function storePlace(s: { storeAddress: string; storeWilaya: string; storeCommune: string }, locale: "fr" | "ar") {
+  const w = WILAYAS.find((x) => wilayaValue(x) === s.storeWilaya)
+  const c = communesOf(s.storeWilaya).find(([fr]) => fr === s.storeCommune)
+  return [s.storeAddress, c && (locale === "ar" ? c[1] : c[0]), w && (locale === "ar" ? w[2] : w[1])].filter(Boolean).join(locale === "ar" ? "، " : ", ")
+}

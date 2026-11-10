@@ -150,6 +150,10 @@ model Settings {
   storeWilaya    String @default("") // Boutique tab: "16 - Alger" (lib/wilayas), shown to a customer picking up
   storeCommune   String @default("") // Boutique tab: Latin commune name of storeWilaya (lib/communes)
   storeAddress   String @default("") // Boutique tab: street, district, hours; shown to a customer picking up
+  storeHoursFr   String @default("") // Boutique tab: opening hours, free text per language ("Sam–Jeu : 9h–19h"); "" = not shown
+  storeHoursAr   String @default("")
+  storeLat       Float? // Boutique tab: the shop's GPS position (pasted "36.7538, 3.0588"); null = no map on the home page
+  storeLng       Float?
   homeEnabled    Boolean @default(true) // Livraison tab: offer "Livraison à domicile" at checkout (at least one method stays on)
   pickupEnabled  Boolean @default(false) // Livraison tab: offer "Retrait en boutique" at checkout
   stopdeskEnabled Boolean @default(false) // Livraison tab: offer "Point relais" (needs StopDesk rows too)
@@ -160,6 +164,9 @@ model Settings {
   courier           String @default("")
   courierKeys       String @default("")
   courierFromWilaya String @default("")
+  parcelOpenable   Boolean @default(false) // Livraison (debug): the customer may open the parcel before paying (dzship hasOpenPackage)
+  parcelInsured    Boolean @default(false) // Livraison (debug): declare the order total as the parcel's value (insurance)
+  parcelWeightKg   Float   @default(0)     // Livraison (debug): weight sent with every parcel, 0 = not sent (courier default)
 }
 
 model OrderItem {

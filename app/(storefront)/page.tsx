@@ -6,11 +6,13 @@ import { getProducts, SHOWN_CATEGORY } from "@/lib/catalog"
 import { db } from "@/lib/db"
 import { getI18n, getSettings } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { storePlace } from "@/lib/wilayas"
+import { WhatsAppIcon } from "@/components/whatsapp-icon"
 
 const LATEST_IMAGE = { products: { take: 1, orderBy: { createdAt: "desc" }, include: { images: { take: 1 } } } } as const
 
 export default async function Home() {
-  const [{ t }, { heroImage }, latest, categories] = await Promise.all([
+  const [{ t, locale }, settings, latest, categories] = await Promise.all([
     getI18n(),
     getSettings(),
     getProducts({}, 6),
@@ -22,6 +24,15 @@ export default async function Home() {
     }),
   ])
   const many = categories.length > 2
+  const { heroImage, storeLat: lat, storeLng: lng } = settings
+  // the shop on a map (Réglages › Boutique coordinates): Google Maps' keyless embed (`output=embed`, no API key, no
+  // script of ours; labels in the shop's language). ponytail: not an official API; if Google ever drops it, switch to
+  // the Maps Embed API (`/maps/embed/v1/place?key=…&q=lat,lng`) with a key in Réglages.
+  const hasMap = lat != null && lng != null
+  // opening hours in the visitor's language, the other one when only one was typed
+  const hours = locale === "ar" ? settings.storeHoursAr || settings.storeHoursFr : settings.storeHoursFr || settings.storeHoursAr
+  const place = storePlace(settings, locale)
+  const mapSrc = hasMap ? `https://maps.google.com/maps?q=${lat},${lng}&z=16&hl=${locale}&output=embed` : ""
 
   return (
     <div className="flex flex-col gap-12 pt-2 md:gap-12">
@@ -65,6 +76,33 @@ export default async function Home() {
           })}
         </div>
       </section>
+
+      {/* the shop: address, hours, directions + WhatsApp, and the map when Réglages has its coordinates */}
+      {(hasMap || place || hours) && (
+        <section className={cn("grid grid-cols-1 gap-6", hasMap && "md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-center")}>
+          <div className="flex flex-col gap-4">
+            <h2 className="text-2xl font-medium md:text-[32px]">{t.home.store}</h2>
+            {place && <p className="text-lg">{place}</p>}
+            {hours && <p className="text-mute"><span className="font-medium text-ink">{t.admin.hours}</span> {hours}</p>}
+            <div className="flex flex-wrap gap-2">
+              {hasMap && (
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`} target="_blank" rel="noopener noreferrer"
+                  className={buttonVariants()}>{t.home.directions}</a>
+              )}
+              {settings.whatsapp && (
+                <a href={`https://wa.me/${settings.whatsapp}`} target="_blank" rel="noopener noreferrer"
+                  className={buttonVariants({ variant: "secondary", className: "gap-2" })}>
+                  <WhatsAppIcon className="size-5 text-[#25D366]" />{t.home.whatsapp}
+                </a>
+              )}
+            </div>
+          </div>
+          {hasMap && (
+            <iframe src={mapSrc} title={t.home.map} loading="lazy" referrerPolicy="no-referrer"
+              className="aspect-[4/3] w-full border-0 bg-cloud md:aspect-[16/10]" />
+          )}
+        </section>
+      )}
     </div>
   )
 }

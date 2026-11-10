@@ -116,8 +116,10 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   order keeps the saved address); `atelier:last-order` = `{ ref, total, fee, method, pickup?, desk?, items }`.
 - **Réglages** (`/admin/settings`, model `Settings`, single row `id = 1` inserted by its migration):
   store name, WhatsApp number, FR/AR tagline, shop address as wilaya › commune › street (`storeWilaya` "16 - Alger",
-  `storeCommune` Latin name checked with `isCommune`, `storeAddress`; the cart page joins them in the UI language for the
-  pickup line), low-stock threshold (debug) (Boutique); FR/AR hero title,
+  `storeCommune` Latin name checked with `isCommune`, `storeAddress`; `storePlace()` in `lib/wilayas.ts` joins them in the
+  UI language for the cart's pickup line and the home page), opening hours (`storeHoursFr` / `storeHoursAr`, a FR/AR
+  `pair()`, shown under the address on the home page and on the pickup line; the other language when one is empty), GPS position (`storeLat` / `storeLng`, pasted as one
+  "36.7538, 3.0588" field; null = no map), low-stock threshold (debug) (Boutique); FR/AR hero title,
   hero image (Page d'accueil); Livraison = full width, three columns from `xl` (form 16rem, the two lists share the rest; two
   from `lg`, the third wraps under the first; phones stack): the save form (pickup / stop-desk switches; **in debug** also the FR/AR delivery text, the courier
   picker, its credentials, origin wilaya and the "Charger la grille…" button), the per-wilaya tariff (`?fp=`, 10 rows per
@@ -136,8 +138,9 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   (`lib/i18n.ts`, React `cache` = one query per request). Empty text = dictionary default. Never hard-code the
   "Stock faible" `3` again: use `lowStock`. No loose explanatory text on Réglages: every explanation is a `hint`
   (help icon); the FR/AR `pair()` fields carry `settingsHint` ("empty = default") on their first field.
-- **Wilaya + commune**: `lib/wilayas.ts` (58 wilayas, value `"16 - Alger"`) and `lib/communes.ts` (1541 communes
-  from the user's CSV, keyed by wilaya **code**, `[latin, arabic]`). Orders store the commune's Latin name; labels
+- **Wilaya + commune**: `lib/wilayas.ts` (58 wilayas, value `"16 - Alger"`) and `lib/communes.ts` (1541 communes,
+  generated from dzship's `GET /v1/communes`, keyed by wilaya **code**, `[latin, arabic]`; the Latin name is exactly what
+  the courier gateway expects). Orders store the commune's Latin name; labels
   follow the UI language. `checkout` refuses a commune outside the posted wilaya (`isCommune`). Never rename stored
   wilaya values: map spellings to a courier's list (Yalidine) at export / API time.
 - **Delivery fee**: per destination wilaya and method, model `WilayaFee { wilaya, home, desk }` (one row per wilaya,
@@ -191,7 +194,9 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   never get the button; a relay order needs its point's `commune` (`?error=courierDesk`), the point's `deskId` is sent
   when set. The courier picker is a GET form (`?tab=courier&courier=<key>` re-renders that courier's credential
   fields, password inputs: empty = keep the stored value; "— Aucun" = feature off). "Sandbox" in the list tests the
-  flow without creating anything. **Tracking**: a sent order's card shows the parcel's last courier status and "Actualiser
+  flow without creating anything. **Parcel options** (Réglages › Livraison, debug, under the courier fields):
+  `parcelOpenable` → `hasOpenPackage`, `parcelInsured` → `declaredValue = totalAmount`, `parcelWeightKg` (0 = not sent)
+  → `weightKg`; `parcelFor(order, settings)` adds them. **Tracking**: a sent order's card shows the parcel's last courier status and "Actualiser
   le suivi" (`trackOrder` → `trackParcel()` = dzship `POST /v1/track`; kept in `Order.courierStatus` (dzship's vocabulary,
   labels `t.courierStatus`), `courierRaw` (courier wording, shown for `unknown`), `courierCheckedAt`). The order moves
   forward by `statusSteps()` (`lib/courier.ts`, unit-tested): on its way → `SHIPPED`, delivered → `DELIVERED`, returned →
@@ -1182,6 +1187,60 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   already Expédiée); run again with the default hour → "checked 0". "Tout actualiser 5" on Commandes → toast
   "5 colis vérifiés, 0 commandes avancées."; 375px no sideways scroll (the button sits on its own line under the title).
   The server's crontab line itself is untested (no server yet).
+
+### 2026-11-10 — Communes aligned with dzship
+- User pasted dzship's wilaya list and asked to compare. The commune list came from its public `GET /v1/communes`
+  (no credentials). Result: 58 wilaya names identical; 1506 / 1541 communes identical, 33 differing by accents / caps /
+  hyphens ("Sidi M'hamed" → "Sidi M'Hamed", "Larbaa" → "Larbâa"), "M'sirda Fouaga" → "MSirda Fouaga", and Tabelbala
+  in 08 Béchar for us but 52 Béni Abbès at dzship (the 2019 split). User: align them. `lib/communes.ts` regenerated
+  from dzship (Arabic spaces collapsed; it also fixes our "Ain Beida Harriche" Arabic, which held stray quote marks).
+  Migration `…101000_dzship_communes` (data only) renames the stored values in `Order`, `StopDesk` and `Settings.storeCommune`
+  and moves Tabelbala rows to "52 - Béni Abbès", so a restored backup gets fixed by `migrate deploy`.
+- Slip, caught before commit: the first version of the rename script matched names across wilayas, so three
+  same-named communes in another wilaya were picked (Larbaa Blida → Batna, Sidi M'hamed M'Sila → Alger, Ain El Hadjar
+  Saïda → Bouira) and two Blida relay points landed in Batna. The local DB was restored from the backup taken just
+  before (`prisma/backups/store-2026-11-10-11-04.db`), the script fixed (same wilaya first; another wilaya only for a
+  single unique match), the migration regenerated and applied. Only Tabelbala moves now.
+- Verified: re-comparison 1541 / 1541 exact; Larbâa points back in Blida; `isCommune` true for the new spellings,
+  false for the old; every migration replays on a scratch DB; 15 tests; cart 200.
+
+### 2026-11-10 — Parcel options, shop map on the home page
+- User asked whether orders carry everything Yalidine needs: every field dzship's OpenAPI marks required is sent
+  (recipient name / phone / wilaya code / commune, delivery type, product list, COD amount). Then "add them" = the
+  optional ones that fit Réglages: open before paying, insured value, a fixed weight (migration `parcel_options`). Not
+  added: a second phone (needs a checkout field) and a note for the courier (the order note is the admin's call log).
+  Verified: saved in Réglages (checkboxes + 1.5 kg), a demo parcel sent to Sandbox with `hasOpenPackage`,
+  `declaredValue 9850`, `weightKg 1.5` → accepted (`DZTEST-Z01Y0Q`, nothing written to the DB); unit test; options reset.
+- User: a map of the shop on the home page from the admin's coordinates. Migration `store_location`
+  (`Settings.storeLat` / `storeLng`, nullable). Réglages › Boutique: "Position GPS de la boutique" (one field; accepts
+  "36.7538, 3.0588", "36.7538,3.0588", "36,7538 ; 3,0588"; a comma is a decimal mark only without any dot; out of range
+  → `?error=badCoords`). Home: a last "Notre boutique" section with the address line, "Itinéraire" (Google Maps
+  directions) and "Agrandir la carte" (Google Maps search), plus a map iframe (`loading="lazy"`,
+  `referrerPolicy="no-referrer"`). Section hidden without coordinates. First an OpenStreetMap embed, then (user:
+  "what about google maps?", picked the keyless option) Google's `maps.google.com/maps?q=lat,lng&z=16&hl=<locale>&output=embed`:
+  no key, labels in the shop's language. It 301s to `/maps/embed?pb=…`, which answers 200 with no `X-Frame-Options`
+  (only the redirect carries `SAMEORIGIN`, which browsers ignore). Not an official API: if it breaks, use the Maps
+  Embed API (`/maps/embed/v1/place?key=…`, free, needs a Google Cloud key with billing on).
+- Verified: bad coordinates → toast; "36.6652,2.9431" saved and shown back as "36.6652, 2.9431"; home renders the
+  section with the right links in FR and AR, no sideways scroll at 375; without coordinates the page has no map.
+  **Not seen**: the map tiles themselves — the preview pane doesn't load outside sites in frames. Checked by headers
+  only (above); open the home page in a real browser once the coordinates are set. Test coordinates removed afterwards (the
+  user's shop position is theirs to type).
+- Migration order: `prisma migrate dev` names folders in UTC, so the hand-named `…120500_dzship_communes` (local time)
+  sorted after `parcel_options`; renamed `…101000_dzship_communes` (its real apply order) with its history row updated.
+  Name hand-made migrations with `date -u`.
+
+### 2026-11-10 — Opening hours, home store section, shop link in a new tab
+- User: hours apart from the address. Migration `store_hours` (`Settings.storeHoursFr` / `storeHoursAr`); Réglages ›
+  Boutique "Horaires d'ouverture" FR/AR under the address (the address hint no longer says "horaires"). The cart's
+  pickup line = address, then "Horaires : …" on its own line (also what `/merci` gets through `atelier:last-order`).
+- Home "Notre boutique" section now shows whenever there's an address, hours or coordinates (map column only with
+  coordinates). "Agrandir la carte" replaced (user) by "Nous écrire sur WhatsApp" (`wa.me/<Settings.whatsapp>`, shown when
+  the number is set) next to "Itinéraire".
+- Admin "Voir la boutique" opens the shop in a new tab (`target="_blank"`, plain `<a>`).
+- Verified: hours saved and read back (FR + AR); home section FR "Horaires : Sam–Jeu : 9h–19h" and AR text; WhatsApp
+  button with a temporary number (`wa.me/213555123456`), hidden when empty; cart pickup line with the hours on line 2.
+  Test hours and number removed afterwards; the user's own coordinates (Douira) were left as they set them.
 
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.

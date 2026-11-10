@@ -63,3 +63,12 @@ test("statusSteps: final orders and admin-decided statuses change nothing", () =
   for (const s of ["DELIVERED", "RETURNED", "CANCELLED"] as const) assert.deepEqual(statusSteps("delivered", s), [])
   for (const c of ["cancelled", "lost", "on_hold", "unknown", "nonsense"]) assert.deepEqual(statusSteps(c, "SHIPPED"), [])
 })
+
+test("parcel options: open before paying, insured at the total, weight only when set", () => {
+  const p = parcelFor(base, { parcelOpenable: true, parcelInsured: true, parcelWeightKg: 1.5 })
+  assert.equal(p.hasOpenPackage, true)
+  assert.equal(p.declaredValue, 4900)
+  assert.equal(p.weightKg, 1.5)
+  const none = parcelFor(base, { parcelOpenable: false, parcelInsured: false, parcelWeightKg: 0 })
+  assert.equal("hasOpenPackage" in none || "declaredValue" in none || "weightKg" in none, false)
+})
