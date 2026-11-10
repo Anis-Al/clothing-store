@@ -83,12 +83,11 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
   const where = { ...base, ...(status && { status }) }
   const h = await headers()
   const phone = h.get("sec-ch-ua-mobile") === "?1" || /Mobi/i.test(h.get("user-agent") ?? "")
-  const [{ t, locale }, settings, total, counts, lastSync] = await Promise.all([
+  const [{ t, locale }, settings, total, counts] = await Promise.all([
     getI18n(),
     getSettings(),
     db.order.count({ where }),
     db.order.groupBy({ by: ["status"], where: base, _count: true }), // tab counts follow search, method + dates
-    db.order.aggregate({ _max: { courierCheckedAt: true } }),
   ])
   // "Envoyer à <courier>" once the courier is set up (Réglages › Livraison, debug)
   const courier = courierReady(settings) ? courierOf(settings.courier)?.[1] : undefined
@@ -156,15 +155,10 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
-          <h1 className="flex flex-wrap items-baseline gap-x-3 text-[28px] font-medium">
-            {t.admin.orders}
-            <span className="text-sm font-normal text-mute tabular-nums">{fill(t.admin.ordersCount, { n: total })}{periodLabel && ` · ${periodLabel}`}</span>
-          </h1>
-          {lastSync._max.courierCheckedAt && (
-            <p className="text-xs text-mute">{fill(t.admin.lastSync, { date: formatDate(lastSync._max.courierCheckedAt, locale) })}</p>
-          )}
-        </div>
+        <h1 className="flex flex-wrap items-baseline gap-x-3 text-[28px] font-medium">
+          {t.admin.orders}
+          <span className="text-sm font-normal text-mute tabular-nums">{fill(t.admin.ordersCount, { n: total })}{periodLabel && ` · ${periodLabel}`}</span>
+        </h1>
         {tracked > 0 && (
           <form action={trackAll.bind(null, href({ page }))}>
             <button type="submit" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "gap-2")}>
@@ -267,15 +261,18 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
               {orders.map((o) => {
                 const final = FINAL_STATUSES.includes(o.status)
                 const cancelled = o.status === "CANCELLED"
-                const qty = o.items.reduce((n, i) => n + i.quantity, 0)
                 const sub = o.items.reduce((n, i) => n + i.quantity * i.priceAtPurchase, 0)
+                const qty = o.items.reduce((n, i) => n + i.quantity, 0)
                 const ref = `#${o.id.slice(-8).toUpperCase()}`
                 const { next, more } = final ? { next: undefined, more: [] } : stepsOf(o.status, o.method)
                 const Method = METHOD_ICON[o.method]
-                const where = o.method === "PICKUP" ? methodLabel.PICKUP : `${methodLabel[o.method]} · ${place(o.wilaya, o.commune)}`
+                // row: "À domicile → Oran" (the arrow follows the reading direction)
+                const where = o.method === "PICKUP" ? methodLabel.PICKUP : `${methodLabel[o.method]} ${locale === "ar" ? "←" : "→"} ${place(o.wilaya, o.commune)}`
                 const reached = cancelled ? -1 : o.status === "RETURNED" ? 3 : FLOW.indexOf(o.status as (typeof FLOW)[number])
                 const courierName = courierOf(o.courier)?.[1] ?? o.courier
                 const courierState = o.courierStatus && (o.courierStatus === "unknown" && o.courierRaw ? o.courierRaw : (t.courierStatus[o.courierStatus] ?? o.courierStatus))
+                // courier states that need the admin (a failed attempt, a hold, a return on its way, lost…) read amber
+                const trouble = !!o.courierStatus && !["created", "pending_pickup", "picked_up", "in_transit", "at_hub", "out_for_delivery", "delivered", "returned"].includes(o.courierStatus)
                 const mine = courier && !final && o.courier === settings.courier
                 // a submit button posts its own name/value: status=<target>. The ⋯ menu's buttons are portalled out of
                 // the form, so every step button names it (`form`).
@@ -303,20 +300,19 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                         {/* delivery: where, the parcel, and how far the order got */}
                         <div className="flex min-w-0 flex-col gap-3 text-sm">
                           <h3 className={caption}>{t.admin.delivery}</h3>
-                          <div className="flex items-center gap-2 font-medium"><Method className="size-4 shrink-0" aria-hidden />{where}</div>
-                          {o.address && <p className="text-mute">{o.address}</p>}
+                          {/* the method, then the postal address: street, commune, wilaya (a relay order's street is the point's) */}
+                          <div className="flex items-center gap-2 font-medium"><Method className="size-4 shrink-0" aria-hidden />{methodLabel[o.method]}</div>
+                          {o.method === "HOME" && <p>{[o.address, place(o.wilaya, o.commune)].filter(Boolean).join(locale === "ar" ? "، " : ", ")}</p>}
+                          {o.method === "STOPDESK" && <p>{o.address}</p>}
                           {o.tracking && (
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs text-mute">{t.admin.sCourier}</span>
-                              <span>{courierName}</span>
-                              <span className="mt-1 text-xs text-mute">{t.admin.tracking}</span>
+                              <span className="text-xs text-mute">{t.admin.tracking} · {courierName}</span>
                               <div className="flex flex-wrap items-center gap-1">
                                 <span className="font-mono font-semibold" dir="ltr">{o.tracking}</span>
                                 <CopyButton text={o.tracking} label={t.admin.copy} />
                                 {o.labelUrl && <a href={o.labelUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline underline-offset-4">{t.admin.label}</a>}
                                 {refresh(true)}
                               </div>
-                              {o.courierCheckedAt && <span className="text-xs text-mute">{courierState && `${courierState} · `}{fill(t.admin.checkedOn, { date: formatDate(o.courierCheckedAt, locale) })}</span>}
                             </div>
                           )}
                           {!o.tracking && courier && !final && o.method !== "PICKUP" && (
@@ -327,7 +323,8 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                               </ConfirmButton>
                             </form>
                           )}
-                          {/* timeline: the COD flow, the reached steps in the status' colour (a return ends red) */}
+                          {/* timeline: the COD flow, the reached steps in the status' colour (a return ends red); the courier's own
+                              state sits under "Expédiée": that's where the parcel is between our two clicks */}
                           <ol className="mt-1 grid grid-cols-4 gap-1">
                             {FLOW.map((st, i) => {
                               const on = i <= reached
@@ -341,6 +338,11 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                                   </div>
                                   <span className={cn("truncate text-xs font-medium", !on && "text-mute")}>{label}</span>
                                   {i === 0 && <span className="text-[11px] text-mute">{formatDate(o.createdAt, locale)}</span>}
+                                  {i === 2 && courierState && (
+                                    <span className={cn("text-[11px]", trouble ? "font-medium text-[#b45309]" : "text-mute")}>
+                                      {courierState}{o.courierCheckedAt && ` · ${formatDate(o.courierCheckedAt, locale)}`}
+                                    </span>
+                                  )}
                                 </li>
                               )
                             })}
@@ -355,7 +357,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                               <div key={i.id} className="flex justify-between gap-3 border-b border-hairline-soft px-3.5 py-2.5">
                                 <div className="flex min-w-0 flex-col">
                                   <span className="font-medium">{i.variant.product.name}</span>
-                                  <span className="text-xs text-mute">{i.variant.color} · {i.variant.size} · <span dir="ltr">{i.variant.sku}</span></span>
+                                  <span className="text-xs text-mute">{i.variant.color} · {i.variant.size}</span>
                                 </div>
                                 <div className="flex shrink-0 flex-col items-end tabular-nums">
                                   <span className="font-medium">{formatPrice(i.quantity * i.priceAtPurchase, locale)}</span>
@@ -382,14 +384,10 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                       </div>
                     }>
                     <div className={cn(cols, "flex flex-col gap-2.5 p-3.5 lg:px-3 lg:py-3")}>
-                      {/* status, ref, date */}
+                      {/* status + ref (the date is in the panel's timeline; the list is sorted by it anyway) */}
                       <div className="flex items-center justify-between gap-2 lg:flex-col lg:items-start lg:gap-1">
                         <StatusChip s={o.status} label={statusLabel(o.status, o.method)} />
-                        <span className="flex items-center gap-1.5 text-xs text-mute lg:contents">
-                          <span className="font-mono text-xs font-semibold text-ink" dir="ltr">{ref}</span>
-                          <span className="lg:hidden">·</span>
-                          <span className="text-xs text-mute">{formatDate(o.createdAt, locale)}</span>
-                        </span>
+                        <span className="font-mono text-xs font-semibold" dir="ltr">{ref}</span>
                       </div>
 
                       {/* customer: name, phone + WhatsApp (phones: square buttons at the end), the note in one line */}
@@ -418,14 +416,11 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                       {/* items + total: one bordered line on phones, two cells on desktop */}
                       <div className="flex items-center justify-between gap-3 border-t border-hairline-soft pt-2.5 lg:contents">
                         <div className="flex min-w-0 flex-col">
-                          <span className="font-medium max-lg:hidden">{fill(t.admin.itemsCount, { n: qty })}</span>
-                          <span className="truncate text-sm text-mute">
-                            {o.items.map((i) => `${i.quantity > 1 ? `${i.quantity} × ` : ""}${i.variant.product.name}${o.items.length === 1 ? ` · ${i.variant.color} · ${i.variant.size}` : ""}`).join(" · ")}
-                          </span>
+                          {/* the piece count only (user's call); the names, colours and sizes are in the panel */}
+                          <span className="text-sm font-medium">{fill(t.admin.itemsCount, { n: qty })}</span>
                         </div>
                         <div className="flex shrink-0 flex-col items-end tabular-nums">
                           <span className={cn("font-semibold", cancelled && "line-through")}>{formatPrice(o.totalAmount, locale)}</span>
-                          <span className="text-xs text-mute whitespace-nowrap max-lg:hidden">{o.shippingFee ? fill(t.admin.feeIncl, { fee: formatPrice(o.shippingFee, locale) }) : t.admin.feeNone}</span>
                         </div>
                       </div>
 
@@ -434,8 +429,9 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                         <span className="flex items-center gap-2 max-lg:hidden"><Method className="size-4 shrink-0" aria-hidden /><span className="truncate font-medium">{where}</span></span>
                         {o.tracking && (
                           <span className="flex min-w-0 items-center gap-2 text-xs">
-                            {courierState && <span className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md bg-cloud px-2 font-medium text-ink whitespace-nowrap"><Dot s="SHIPPED" />{courierState}</span>}
-                            <span className="min-w-0 truncate text-mute">{courierName} · <span className="font-mono" dir="ltr">{o.tracking}</span></span>
+                            {courierState
+                              ? <span className={cn("inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 font-medium whitespace-nowrap", trouble ? "bg-[#b45309]/10 text-[#b45309]" : "bg-cloud text-ink")}><Dot s={trouble ? "PENDING" : "SHIPPED"} />{courierState}</span>
+                              : <span className="min-w-0 truncate font-mono text-mute" dir="ltr">{o.tracking}</span>}
                             {refresh(false)}
                           </span>
                         )}

@@ -82,11 +82,12 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   page; the GET forms carry the rest with `keep(...)`. A new param goes into `cur` there, or saves and tab switches drop it.
   Layout (from the 2026-11-10 mockup): status tab strip, then search · period segments (Tout / Aujourd'hui / 7 j / 30 j /
   Personnalisé… = the two date fields in a popover) · method · sort, then a bordered **table** from `lg` (`cols` in the
-  page: Commande = status chip + ref + date · Client = name, phone + WhatsApp, note line · Livraison = method · place,
-  courier state chip + parcel number · Articles · Total + "dont livraison" · Actions = next-step button, ⋯, chevron),
-  6 per page, and the same rows as **cards** below `lg` (2 per page, phone sniffed from the headers like Stock). The
+  page: Commande = status chip + ref · Client = name, phone + WhatsApp, note line · Livraison = method · place,
+  courier state chip (the parcel number until the first check) · Articles (the piece count only, "n article(s)"; names in the panel) · Total · Actions = next-step
+  button, ⋯, chevron), 6 per page, and the same rows as **cards** below `lg` (2 per page, phone sniffed from the headers like Stock). The
   chevron (`RowToggle`, context from `OrderRow` in `components/admin/client.tsx`) opens a details panel under the row:
-  Livraison (address, courier, parcel number + `CopyButton` + refresh, 4-step timeline), Articles (itemised, sous-total /
+  Livraison (address, parcel number + courier + `CopyButton` + refresh, 4-step timeline whose "Expédiée" step carries the
+  courier's own state + check date as its sub-label; trouble states amber), Articles (itemised, sous-total /
   livraison / total), Note (`NoteInput`). The status chip is solid in its colour with an icon (`StatusChip`); tabs keep the
   bare `TONE` dot. Footer: "1–6 sur 16" + `Pager`. Not built from the mockup: checkboxes / bulk actions, Exporter, Imprimer,
   "Action requise", the history log (no data behind them).
@@ -1431,6 +1432,25 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   Its submit buttons name their form (`form` attribute) since they're no longer inside it. Checked: panel in `<body>`,
   fully visible, 4px under the trigger, buttons bound to the right form, outside click closes it; RTL aligned on the
   left edge; phone card too. Pagination (user): 6 rows on desktop, 2 cards on phones.
+
+- Less on the row (user: "lessing the details"): dropped the date (it's the first step of the panel's timeline and the
+  list is sorted by it), the courier name + parcel number next to the state chip (panel), the "n article(s)" line above
+  the items, "dont livraison" under the total (itemised in the panel); the panel lost the "Transporteur" label line and
+  the SKU. Rows 89 → 79px, back to 8 per page on desktop (2 cards on phones).
+
+- Courier state vs our timeline (user asked if redundant): our 4 steps are the shop's decisions, the courier state is
+  finer (5 states between Expédiée and Livrée, plus the trouble ones). The panel showed it twice; now the courier state
+  + check date is the sub-label of the "Expédiée" step, and `delivery_attempted` / `on_hold` / `return_in_transit` /
+  `cancelled` / `lost` / `unknown` read amber there and on the row chip (`trouble`). Checked with a demo order set to
+  `delivery_attempted` for the screenshot, then put back to `in_transit`.
+
+- Header line "Suivi transporteur vérifié le …" removed (user); its `_max(courierCheckedAt)` query and `lastSync` strings too.
+
+- Panel address (user): the method on its own line, then "street, commune, wilaya" in one postal line (`place()`); a relay
+  order shows the point's "name — address" alone (it already ends with its place); pickup orders show the method only. Rows read "À domicile → Oran" (← in Arabic).
+
+- Row items (user: ambiguous, then "no names"): the Articles cell is the piece count only, "2 article(s)"; the panel
+  itemises. The panel address is ink, not muted (user).
 
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
