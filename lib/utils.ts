@@ -76,6 +76,8 @@ export function listHref(path: string, cur: ListParams, patch: Partial<ListParam
   return p.size ? `${path}?${p}` : path
 }
 
+export const DESK_PAGE = 10 // relay points per page (Réglages › Livraison; the add action lands on the new point's page)
+
 // Page is clamped: a stale ?page=9 after filtering shows the last page instead of nothing.
 export function paginate(total: number, page: number, perPage: number) {
   const pages = Math.max(1, Math.ceil(total / perPage))

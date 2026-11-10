@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { courierReady, parcelFor, type OrderToSend } from "./courier"
+import { courierReady, parcelFor, statusSteps, type OrderToSend } from "./courier"
 import { COURIERS, courierOf } from "./couriers"
 
 const variant = { product: { name: "Hoodie" }, color: "Noir", size: "M" }
@@ -42,4 +42,24 @@ test("courierReady: every credential of the courier, origin wilaya for the Yalid
   assert.equal(courierReady({ courier: "dhd", courierKeys: '{"token":"t"}', courierFromWilaya: "" }), true)
   assert.equal(courierReady({ courier: "sandbox", courierKeys: "", courierFromWilaya: "" }), true)
   assert.equal(courierReady({ courier: "nope", courierKeys: "not json", courierFromWilaya: "" }), false)
+})
+
+test("statusSteps: a parcel on its way ships an open order, never moves backwards", () => {
+  assert.deepEqual(statusSteps("in_transit", "PENDING"), ["SHIPPED"])
+  assert.deepEqual(statusSteps("out_for_delivery", "CONFIRMED"), ["SHIPPED"])
+  assert.deepEqual(statusSteps("in_transit", "SHIPPED"), [])
+  assert.deepEqual(statusSteps("created", "CONFIRMED"), []) // not collected yet
+  assert.deepEqual(statusSteps("pending_pickup", "PENDING"), [])
+})
+
+test("statusSteps: delivered / returned end the order, a return goes through SHIPPED", () => {
+  assert.deepEqual(statusSteps("delivered", "SHIPPED"), ["DELIVERED"])
+  assert.deepEqual(statusSteps("delivered", "CONFIRMED"), ["DELIVERED"])
+  assert.deepEqual(statusSteps("returned", "SHIPPED"), ["RETURNED"])
+  assert.deepEqual(statusSteps("returned", "CONFIRMED"), ["SHIPPED", "RETURNED"])
+})
+
+test("statusSteps: final orders and admin-decided statuses change nothing", () => {
+  for (const s of ["DELIVERED", "RETURNED", "CANCELLED"] as const) assert.deepEqual(statusSteps("delivered", s), [])
+  for (const c of ["cancelled", "lost", "on_hold", "unknown", "nonsense"]) assert.deepEqual(statusSteps(c, "SHIPPED"), [])
 })

@@ -58,6 +58,7 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
+  container,
   side = "bottom",
   sideOffset = 4,
   align = "center",
@@ -68,9 +69,10 @@ function SelectContent({
   Pick<
     SelectPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
-  >) {
+  > & { container?: SelectPrimitive.Portal.Props["container"] }) {
   return (
-    <SelectPrimitive.Portal>
+    // container: a popup portalled to <body> sits under a modal <dialog>'s top layer (unclickable); FormSelect passes the dialog
+    <SelectPrimitive.Portal container={container}>
       <SelectPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}

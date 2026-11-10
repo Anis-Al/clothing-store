@@ -107,6 +107,9 @@ model Order {
   courier     String      @default("") // courier key (lib/couriers.ts) the parcel was created with, "" = not sent
   tracking    String      @default("") // the courier's tracking number once the parcel is created from the admin
   labelUrl    String      @default("") // printable label link returned at creation (Yalidine family, Ecotrack)
+  courierStatus    String    @default("") // last parcel status from dzship's /v1/track (its vocabulary: in_transit, delivered…)
+  courierRaw       String    @default("") // the courier's own wording of that status (shown when dzship says "unknown")
+  courierCheckedAt DateTime? // when the admin last refreshed the tracking
   createdAt   DateTime    @default(now())
   items       OrderItem[]
 }
@@ -144,7 +147,10 @@ model Settings {
   shippingTextFr String @default("")
   shippingTextAr String @default("")
   whatsapp       String @default("") // digits, international format; "" hides the button
+  storeWilaya    String @default("") // Boutique tab: "16 - Alger" (lib/wilayas), shown to a customer picking up
+  storeCommune   String @default("") // Boutique tab: Latin commune name of storeWilaya (lib/communes)
   storeAddress   String @default("") // Boutique tab: street, district, hours; shown to a customer picking up
+  homeEnabled    Boolean @default(true) // Livraison tab: offer "Livraison à domicile" at checkout (at least one method stays on)
   pickupEnabled  Boolean @default(false) // Livraison tab: offer "Retrait en boutique" at checkout
   stopdeskEnabled Boolean @default(false) // Livraison tab: offer "Point relais" (needs StopDesk rows too)
   lowStock       Int    @default(3) // "Stock faible" at or below this

@@ -69,10 +69,12 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - **Admin feedback**: actions redirect with `?saved=1` or `?error=<key>` (a key of `t.admin`); `Notice`
   shows it as a bottom-end toast. Keep the page's own params in that redirect (settings `tab`, list
   filters, orders `back`, categories `open`), or the admin lands somewhere else after each save.
-- **Commandes URL** (`/admin/orders`): `status`, `q`, `sort` (`date|wilaya|total` + `-asc|-desc`, none = newest
-  first), `from` / `to` (YYYY-MM-DD), `page`. Every tab, header, pager link and every `back` passed to the status
-  and note actions comes from `href(patch)` in the page; the two GET forms carry the rest with `keep(...)`.
-  A new param goes into `cur` there, or saves and tab switches drop it.
+- **Commandes URL** (`/admin/orders`): `status`, `method` (`HOME|PICKUP|STOPDESK`), `q`, `sort` (`date|wilaya|total` +
+  `-asc|-desc`, none = newest first; picked from a select, "date-desc" = none), `from` / `to` (YYYY-MM-DD), `page` (3 orders per page, `PER_PAGE`).
+  Every tab, pager link and every `back` passed to the status / note / courier actions comes from `href(patch)` in the
+  page; the GET forms carry the rest with `keep(...)`. A new param goes into `cur` there, or saves and tab switches drop it.
+  Layout: one card per order (ref · date · method badge, then customer + call / WhatsApp + note · delivery + courier ·
+  items · total with its fee + status), the card's start edge and the status dots use `TONE` (one colour per status).
 - **Images**: every upload goes through `saveUpload()` (`lib/actions/admin.ts`: jpg/png/webp/avif/gif,
   ≤ 8 MB, no SVG) into `public/uploads/` (created at boot by `instrumentation.ts`), URL
   `/uploads/<Date.now()>-<name>`, kept in `Image` (products) or `Settings.heroImage`. Deleting the row
@@ -88,8 +90,11 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - **Variant** (one color × size row) is "Variante(s)" in FR and "متغيّر / المتغيرات" in AR. Never
   "déclinaison" or "صنف / أصناف" (user's call: jargon / reads like "category").
 - **Categories** are a two-level tree (`Category.parentId`; depth checked in the actions, not the DB),
-  managed in Réglages › Catégories (`/admin/settings/categories`): one `<details>` fold per main
-  category, all folded on load, `?open=<main id>` unfolds the group the last action touched.
+  managed in Réglages › Catégories (`/admin/settings/categories`): one soft-cloud card per main category with its
+  sub-categories listed inside, product count per row (eye icon = 0 = hidden in the shop). Read-only until "Modifier"
+  (`?edit=1`): names become inline fields (`NoteInput`: Enter or blur saves), empty ones get a trash icon, each card an
+  "Ajouter une sous-catégorie…" field, and a field on top adds a main category. Rows rename only; the parent is the card.
+  The actions still append `?open=<main id>` (unused since the folds went).
   Navbar = main categories, sub-categories in a CSS hover/focus menu.
   `?category=<slug>` on a main category includes its sub-categories (storefront `inCategory`, admin
   `OR: [{ id }, { parentId }]`). The shop lists only categories with products (`SHOWN_CATEGORY`).
@@ -104,13 +109,23 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   `atelier:shipping` = the whole checkout form incl. `method` and `stopDeskId` (merged on save, so a pickup
   order keeps the saved address); `atelier:last-order` = `{ ref, total, fee, method, pickup?, desk?, items }`.
 - **Réglages** (`/admin/settings`, model `Settings`, single row `id = 1` inserted by its migration):
-  store name, WhatsApp number, FR/AR tagline, store address, low-stock threshold (Boutique); FR/AR hero title,
-  hero image (Page d'accueil); pickup / stop-desk switches, FR/AR delivery text, then the per-wilaya tariff table
-  (Livraison);
-  Yalidine API keys + origin wilaya, then the relay points (`StopDesk`, add / delete forms) (Yalidine). Tabs
-  (`SettingsNav` in `components/admin/fields.tsx`): Boutique · Page d'accueil · Livraison · Yalidine are `?tab=` on
-  the same page, one short form each; `updateSettings(tab, f)` writes only the fields the form posted (`f.has`), so
-  a new setting goes in exactly one tab, and a checkbox needs a hidden `""` twin + `f.getAll(k).includes("on")`.
+  store name, WhatsApp number, FR/AR tagline, shop address as wilaya › commune › street (`storeWilaya` "16 - Alger",
+  `storeCommune` Latin name checked with `isCommune`, `storeAddress`; the cart page joins them in the UI language for the
+  pickup line), low-stock threshold (debug) (Boutique); FR/AR hero title,
+  hero image (Page d'accueil); Livraison = full width, three columns from `xl` (form 16rem, the two lists share the rest; two
+  from `lg`, the third wraps under the first; phones stack): the save form (pickup / stop-desk switches; **in debug** also the FR/AR delivery text, the courier
+  picker, its credentials, origin wilaya and the "Charger la grille…" button), the per-wilaya tariff (`?fp=`, 10 rows per
+  page, `updateWilayaFees` writes only the rows posted) and the relay points (`StopDesk`, add form + list, `?dp=`,
+  `DESK_PAGE` = 10; add lands on the new point's page, delete stays on its page). Every grid that stacks on phones
+  needs `grid-cols-1`: an implicit track sizes to its content and overflows the screen. Tabs (`SettingsNav` in `components/admin/fields.tsx`): Boutique · Page
+  d'accueil · Livraison are `?tab=` on the same page, one short form each; `updateSettings(tab, f)` writes only the
+  fields the form posted (`f.has`), so a new setting goes in exactly one tab, and a checkbox needs a hidden `""` twin +
+  `f.getAll(k).includes("on")`.
+- **Debug mode** (Odoo-style): `?debug=1` on Réglages shows technical fields: the whole courier block (picker incl.
+  the "Sandbox" entry, credentials, origin wilaya, Yalidine defaults button), the relay point `deskId` field and the
+  `#id` tags, the FR/AR "Livraison et retours" text, the "Stock faible" threshold (Boutique). `SettingsNav debug` keeps it on every tab link; the settings actions keep it across saves by reading the
+  `referer` (`debugQ()` in `lib/actions/admin.ts`), so no hidden input is needed. Gate a field with `debug && (...)`.
+  Outside debug the save form doesn't post `courier`, so the saved courier stays.
   Catégories is its own route, listed in the same tab row (`SettingsTab`). Read with `getSettings()`
   (`lib/i18n.ts`, React `cache` = one query per request). Empty text = dictionary default. Never hard-code the
   "Stock faible" `3` again: use `lowStock`. No loose explanatory text on Réglages: every explanation is a `hint`
@@ -121,7 +136,7 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   wilaya values: map spellings to a courier's list (Yalidine) at export / API time.
 - **Delivery fee**: per destination wilaya and method, model `WilayaFee { wilaya, home, desk }` (one row per wilaya,
   table in Réglages › Livraison, `updateWilayaFees` upserts all 58). Nothing is seeded (the tariff is the courier's):
-  a missing row = 0 = free. When the saved courier is Yalidine or a sister network, Réglages › Transporteur shows
+  a missing row = 0 = free. When the saved courier is Yalidine or a sister network, Réglages › Livraison (debug) shows
   "Charger la grille tarifaire et les agences Yalidine" (`loadCourierDefaults`: `data/yalidine-fees.csv` +
   `data/yalidine-desks.csv` parsed by `lib/defaults.ts`; the 2019 wilayas take their former parent's tariff; replaces
   every tariff row, adds the agencies missing by `deskId`). Other couriers type their tariff. `checkout` re-reads it (never from the client); the cart gets `fees[wilaya] = [home, desk]` and shows
@@ -133,10 +148,12 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   point's `fee`; `onDelete: SetNull`, so deleting a point keeps the order readable). Pickup is offered while
   `Settings.pickupEnabled` (checkbox, Réglages › Livraison) is on; the address shown with it is `Settings.storeAddress`
   (Réglages › Boutique, optional). Stop-desk is offered while `Settings.stopdeskEnabled` is on **and** a `StopDesk` row exists (Réglages ›
-  Transporteur: wilaya, name, commune, address, the point's id at the courier, typed in, or Yalidine's 200 agencies
+  Livraison: wilaya, name, commune, address, the point's id at the courier, typed in, or Yalidine's 200 agencies
   loaded by the button above when Yalidine is the courier; folded per wilaya in the admin; commune + `deskId` are what
   the API needs to route a parcel there; the fee is the wilaya's `WilayaFee.desk`, not per point). The cart shows the method tiles only when more than one method is offered; the
-  customer's last method is saved in `atelier:shipping` and falls back to `HOME` if no longer offered. `checkout`
+  customer's last method is saved in `atelier:shipping` and falls back to the first offered method if no longer offered.
+  `HOME` is a switch too (`Settings.homeEnabled`, default on): `updateSettings` refuses the Livraison form with all three
+  methods off (`?error=noMethod`). `checkout`
   derives wilaya/address/fee from the desk row, never from the client. Statuses are shared: on a pickup order the
   admin select labels `SHIPPED` "Prête en boutique" (`t.admin.readyPickup`); `RETURNED` = not collected (both methods).
 - **Checkout price check**: the cart sends the prices and fee it displayed; if any differs from the DB,
@@ -154,7 +171,7 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   (`components/admin/fields.tsx`): hover / focus bubble on desktop, tap → bottom bar below `md`. Only a short general
   note may stay as text (Réglages has none).
 - **Courier API** (`lib/courier.ts`, catalog `lib/couriers.ts`): the shop picks **one** delivery company in Réglages ›
-  Transporteur (`Settings.courier` = a key of `COURIERS`, 99 Algerian couriers with their credential field names,
+  Livraison, debug mode only (`Settings.courier` = a key of `COURIERS`, 99 Algerian couriers with their credential field names,
   generated from dzship's `GET /v1/couriers`; `courierKeys` = JSON of those fields; `courierFromWilaya`, required by
   the Yalidine family). Once `courierReady(settings)`, Commandes shows "Envoyer à <courier>" on open home / relay
   orders → `sendToCourier(orderId, back)` creates the parcel through **dzship** (`https://freeship.dzbuild.com/v1/orders`:
@@ -167,7 +184,13 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   never get the button; a relay order needs its point's `commune` (`?error=courierDesk`), the point's `deskId` is sent
   when set. The courier picker is a GET form (`?tab=courier&courier=<key>` re-renders that courier's credential
   fields, password inputs: empty = keep the stored value; "— Aucun" = feature off). "Sandbox" in the list tests the
-  flow without creating anything. Switching to a courier's own API later = `createParcel()` only.
+  flow without creating anything. **Tracking**: a sent order's card shows the parcel's last courier status and "Actualiser
+  le suivi" (`trackOrder` → `trackParcel()` = dzship `POST /v1/track`; kept in `Order.courierStatus` (dzship's vocabulary,
+  labels `t.courierStatus`), `courierRaw` (courier wording, shown for `unknown`), `courierCheckedAt`). The order moves
+  forward by `statusSteps()` (`lib/courier.ts`, unit-tested): on its way → `SHIPPED`, delivered → `DELIVERED`, returned →
+  `RETURNED` via `SHIPPED`, through the same `moveStatus` as a manual change (stock back once); cancelled / lost / on_hold
+  change nothing. Only for the courier saved in Réglages (`?error=courierOther` otherwise) and open orders. Manual, one
+  order per click (no cron). Switching to a courier's own API later = `createParcel()` only.
 
 ## Design system mapping (Nike → this app)
 
@@ -971,6 +994,131 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   with `md:mt-auto` pushing those links to its end. Now `md:sticky md:top-0 md:h-dvh md:overflow-y-auto`: 768px tall
   in a 768px viewport, logout at 720px on an 855px page. Phones unchanged (`contents`).
 
+### 2026-11-10 — Debug mode, Transporteur merged into Livraison, two-column layout
+- `?debug=1` on Réglages (user: "like Odoo"): see the Debug mode convention. Badge "debug" next to the title.
+- Transporteur tab gone (user: "combine livraison and transporteur"): `SETTINGS_TABS` = store · home · delivery;
+  `?tab=courier` falls back to Boutique. Then (user) the courier block became debug-only: a shop sets its courier once.
+- Livraison first got two `<details>` folds (tariff, points), then (user: "a lot of vertical scrolling", "2 horizontal
+  divs … with pagination", then "still need to scroll to the points") the column layout: form | tariff | points side
+  by side from `xl`, tariff 10 rows per page (`?fp=`, the action upserts only the posted rows — a paged form must never
+  zero the rows it doesn't show) and relay points 10 per page (`?dp=`, compact rows "name / wilaya · commune · address",
+  delete bound to the current page). The per-wilaya select tried in between came back later as a filter over the pager. `url(patch)` in the page
+  builds every pager link (keeps `tab`, `debug`, `fp`, `dp`). Help icons removed from the two method checkboxes, the
+  delivery text pair (`pair(..., null)` = no icon) and the tariff heading (user).
+- Verified (dev, user's own server on :3000, pane hidden → DOM-driven): debug badge + nav links + hidden picker input;
+  save with `debug=1` → `?tab=delivery&debug=1&saved=1` (referer); no debug → no picker, no `courier` hidden input,
+  no deskId field / tags; `?courier=sandbox` still shows its trigger; pagers 1/6 and 3/20 with links carrying both
+  pages; `?dp=3` lists Béjaïa; 375px: no sideways scroll (`grid-cols-1` needed: an implicit grid track sizes to
+  content). A wilaya `FormSelect` read right after navigation showed its placeholder: it was pre-hydration, after 2 s
+  it read "16 - Alger · 26" — wait before reading a Select's trigger in the hidden pane.
+
+### 2026-11-10 — Home delivery is a switch too
+- User: "livraison à domicile should also be chosen in Modes de réception". Migration `home_enabled`:
+  `Settings.homeEnabled Boolean @default(true)`. Third checkbox (first in the list) on Livraison; `updateSettings`
+  refuses all three off (`noMethod`); cart builds `methods` from the three flags and falls back to `methods[0]`;
+  `checkout` refuses `HOME` when off (same `priceChanged` path as the other two).
+- Gotcha: `prisma migrate dev` applied the SQL, then failed on `prisma generate` (EPERM, the user's dev server holds the
+  engine dll). Its folder **was** created (`…091531_home_enabled`), but with a UTC timestamp that sorted *before*
+  `…092116_wilaya_fees` (hand-named earlier), so `ls | tail` hid it and a second, hand-written `ADD COLUMN` migration
+  was wrongly added and resolved: a fresh DB would have hit "duplicate column". Fixed by renaming the real folder to
+  `…092500_home_enabled` (between wilaya_fees and store_place, since store_place's RedefineTables copies `homeEnabled`),
+  updating its `_prisma_migrations` row, deleting the duplicate + its row, and replaying every migration on a scratch
+  DB (`DATABASE_URL=file:./scratch.db prisma migrate deploy`: all applied, columns present). Lessons: `ls` the whole
+  folder, not `tail`; on Windows with a dev server running use `migrate dev --skip-generate`, then `prisma generate`
+  once the server is stopped.
+- The user's own `npm run dev` was stopped (with their OK) for `prisma generate`; dev runs from the preview pane again.
+  Verified (DOM-driven): three boxes checked by default; all three off → `?error=noMethod`, flags unchanged; home off →
+  cart (planted item) shows Retrait en boutique* · Point relais only, no address field; flags restored to on.
+  Livraison columns 256 / 393 / 393 px at 1440. typecheck, lint, 12 tests clean.
+
+### 2026-11-10 — Relay point modal, read-only tariff
+- User: the add form out of the Points relais column, in a modal behind "Ajouter". `Modal` (`components/admin/client.tsx`):
+  native `<dialog>` + `showModal()`, backdrop click / Escape / × close it, the server-action form inside redirects and
+  remounts the page, so no close-on-success logic. No dialog dependency added. Title "Nouveau point relais".
+- Then: commune as a dropdown that follows the wilaya, placed right after it (`DeskPlace`, client: `communesOf`, same
+  data as the cart; `key={wilaya}` remounts it empty). Plain labels, not `Field` (fields.tsx pulls server-only i18n).
+  The commune help icon went with it. Order: Wilaya · Commune · Nom du point · Adresse (· Identifiant in debug).
+- Gotcha: a Base UI Select popup is portalled to `<body>`, which sits **under** a modal `<dialog>`'s top layer: the
+  list showed in the DOM but no click reached it. `FormSelect` now finds `input.closest("dialog")` and passes it as the
+  popup's portal `container` (`SelectContent container`). Any future popover inside `Modal` needs the same.
+- Points relais filter (user, after the pager alone): `?w=<wilaya>` GET select above the list (wilayas that have points;
+  the count next to the "Points relais" title follows the filter; × clears), the pager runs over the filtered list, `url()` keeps `w`. Add / delete redirects drop it.
+- "Seuil « Stock faible »" (Boutique) is debug-only too (user).
+- Shop address split (user): migration `store_place` adds `Settings.storeWilaya` / `storeCommune`; `storeAddress` keeps
+  the street. `PlaceFields` (was `DeskPlace`, `components/admin/client.tsx`: `names`, `wilaya`, `commune`, `required`)
+  serves the Boutique tab and the relay point modal. `updateSettings` drops a commune outside the wilaya. The cart page
+  builds the pickup line "street, commune, wilaya" (AR names in Arabic) and passes it as `storeAddress`; `/merci`
+  gets the same text through `atelier:last-order`. Verified: picked 16 - Alger › Alger Centre + a street, saved, cart
+  shows "À retirer en boutique : 12 rue Didouche Mourad, Alger Centre, Alger"; values reset to "" afterwards.
+  Both migrations today ran with `--skip-generate` + `prisma generate` after `preview_stop`.
+- Catégories rows (user): the `?category=<slug>` column and the parent select are gone; a row only renames (hidden
+  `parentId` keeps the parent). Moving a category = delete it (when empty) and re-add under the other parent.
+- Catégories redesign (user: "make the categ ui better looking"): folds + table rows → card grid (1/2/3 columns,
+  `items-start`), no repeated main-category row, no parent select, no per-row Enregistrer buttons; adding a sub-category
+  happens in its card. Summary line "6 catégories · 17 sous-catégories" + help icon. Verified: add "Test pli" in Bas,
+  rename on blur, delete, all staying in edit mode; 375px no sideways scroll; Arabic mirrored.
+- Catégories read-only until "Modifier" (user): `?edit=1` shows the add form, rename fields and delete buttons;
+  "Terminer" leaves. The category actions keep `edit` and `debug` through the referer (`fromReferer(...keys)` in
+  `lib/actions/admin.ts`, which `debugQ` now wraps). Verified: read-only = names + counts, no form; edit = 24 name
+  inputs + add form; re-saving Jeans → `?open=<Bas>&edit=1&saved=1`, still editing; Livraison save with `debug=1`
+  still lands on `…&debug=1`.
+- In debug the courier fields (credentials, "Wilaya de départ") stack one per line: the column is 16rem from `xl`.
+- Tariff read-only until "Modifier" (user): `?edit=fees` renders inputs + Enregistrer / Annuler, otherwise plain
+  values; `url()` keeps `edit` on the pager; a save redirects without it. `t.admin.cancel`, `close`, `newDesk` added.
+- Verified (DOM-driven, 1440): modal opens 512px centred with the fields, × closes; read-only shows 1450 / 1150 and
+  "Modifier"; `?edit=fees&fp=2` → 10 inputs, pager links keep `edit=fees`, save → `?tab=delivery&fp=2&saved=1`,
+  read-only again.
+
+### 2026-11-10 — Commandes redesign
+- User: "redesign the orders route view for better UI/UX". The table became one card per order: top line `#REF` ·
+  date · method badge with an icon (À domicile / Retrait en boutique / Point relais: every order says its method now);
+  then four columns from `xl` (2 from `md`, stacked on phones): customer (name, call pill with the number, WhatsApp pill,
+  inline note), delivery (commune + wilaya, address, courier parcel or "Envoyer à …"), items ("2 × name · colour ·
+  size", total pieces when several lines), total with "Livraison <fee>" under it + status (select or final badge). The
+  last column is a fixed 12rem so the columns line up from card to card.
+- Status colours (`TONE`): En attente amber `#b45309` (needs a call), Confirmée `info`, Expédiée ink, Livrée `success`,
+  Retournée `sale`, Annulée `stone`. Shown as the card's start edge, a dot in the tab strip and in the status select /
+  badge. Cancelled cards get a faint cloud background.
+- New: method filter (`?method=`) and a sort select (newest / oldest / total ↓ ↑ / wilaya A → Z) in one GET form, which
+  replaces the sortable table headers and so also works on phones; title shows the matching count. Tab counts follow
+  the method filter too. Desktop status strip stays on one line (scrolls sideways if it ever has to).
+- Verified with 6 temporary `ZZTEST` orders (inserted straight into the DB, no stock moved, deleted after; DB backed up
+  first: `prisma/backups/store-2026-11-10-09-49.db`): 1440 columns aligned on every card, "Prête en boutique" fits;
+  `?method=STOPDESK` → 1 card + tab counts; `?sort=total-desc` → 18 850 … 6 000; picking Confirmée in a card's select
+  saved and turned its edge blue; 375px no sideways scroll, total + status on one row; Arabic mirrored. The user's real
+  order (KOJNF7Q4, Expédiée) and the variant stock (1) are unchanged.
+
+### 2026-11-10 — Local DB reset to demo data
+- User: "relaunch the app with demo data (and sandbox method)"; picked "back up, wipe, demo + Yalidine data". Backup
+  `prisma/backups/store-2026-11-10-10-00.db` (real product Hoodie La Martina, order KOJNF7Q4, Réglages "Le Repère").
+  `prisma migrate reset --force` (with `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`) → default seed: admin, category
+  tree, 3 demo products / 29 variants. Then a one-off script did what "Charger la grille Yalidine" does (58 tariffs,
+  200 relay points from `data/yalidine-*.csv`; the seed never loads them) and set `courier = "sandbox"` with the three
+  delivery methods on. Uploaded files in `public/uploads/` were left on disk. Store name is back to the default "ATELIER".
+- Checked: /, /products (the 3 demo products), /cart (three method tiles) answer 200; /admin → login.
+- Then (user: "load some orders too"): 16 demo orders over the last 20 days, by a one-off script (not the seed): every
+  status (3 en attente, 2 confirmées, 3 expédiées, 6 livrées, 1 retournée, 1 annulée) and method, fees from the
+  loaded tariff, relay orders on a real `StopDesk` row, shipped home / relay ones with a Sandbox parcel (`DZTEST-…`),
+  stock taken for every order except the returned / cancelled ones. Commandes shows them over 2 pages; the dashboard
+  "Encaissé" reads 53 250 DA.
+
+- Then (user: "compact them" on phones): name and the call / WhatsApp pills share one row, tighter gaps and padding,
+  note field 28px, address clamped to one line, the "n article(s)" line and the pickup "—" hidden below `md`.
+  375px: cards ~410 → ~300px, a page of 3 from 1635 to 1331px tall. 1440px unchanged (columns still aligned).
+
+### 2026-11-10 — Parcel tracking (dzship /v1/track)
+- User asked whether dzship has a tracking endpoint (yes: `POST /v1/track`, read in the zip's `docs/endpoints.md` and
+  `docs/statuses.md`), then "add it". Migration `courier_status`: `Order.courierStatus`, `courierRaw`, `courierCheckedAt`.
+  `lib/courier.ts`: the gateway POST + error parsing is shared (`call()`), `trackParcel()`, `statusSteps()`. Action
+  `trackOrder` reuses `moveStatus`, now extracted from `updateOrderStatus`. Card: status label + "vérifié le …" + a
+  refresh icon (text "Actualiser le suivi" before the first check). `courierSetup` / `courierDesk` texts now point to
+  Réglages › Livraison (the Transporteur tab is gone).
+- Sandbox answers every tracking number with `in_transit` and 3 fake events, so only that path is proven: demo order
+  Sofiane Haddad (Confirmée, DZTEST-JAXHYH) → "En transit · vérifié le 10 nov. 2026", order moved to Expédiée.
+  delivered / returned are covered by `lib/courier.test.ts` only. A real courier account is still needed to see real wording.
+- Slip: `lib/courier.test.ts` was overwritten by a Write meant to create it (the parcel / courierReady tests from
+  `e0d9d2b`); restored from git and the new tests appended. 15 tests pass.
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - **SEO, still missing** (simplest first): `metadataBase` from a new `SITE_URL` env var (needed by the rest);
@@ -980,7 +1128,8 @@ Keep this section last; update it when something here gets done or newly found.
   combo is a duplicate URL; default favicon. Arabic is invisible to search engines (locale is a cookie on the
   same URL): only `/ar/...` routes + `hreflang` would fix it.
 - **Courier integration** (done 2026-11-10 through dzship, see Conventions): one-way parcel creation + tracking.
-  Not done: status sync (`POST /v1/track` → `SHIPPED` / `DELIVERED` / `RETURNED`), per-wilaya delivery fee
+  Tracking is manual, per order ("Actualiser le suivi"): no scheduled sync, no "refresh all shipped" button, no event
+  history shown (only the last status). Not done: per-wilaya delivery fee
   (`POST /v1/rates`), relay points pulled from the courier (`POST /v1/desks`) instead of typed by hand, label
   printing for couriers that return none, a second courier at the same time (one courier per shop today), going to a
   courier's own API (Yalidine: `https://api.yalidine.app/v1/parcels`, headers `X-API-ID` / `X-API-TOKEN`, JSON array
@@ -999,8 +1148,7 @@ Keep this section last; update it when something here gets done or newly found.
   edited by hand (no CSV import / export). Built-in tariff + agencies exist for Yalidine only (`data/yalidine-*.csv`,
   a static copy from 2026-11: re-paste when Yalidine changes its grid); other couriers type theirs, or later pull them
   through dzship's `POST /v1/rates` / `POST /v1/desks`. Relay points have no edit row (delete + re-add).
-  Admin Commandes can't filter by method (home / pickup / relay), and the "Expédiée" tab is also where "Prête en
-  boutique" pickup orders sit. Admin orders show the total only, not the fee part. Orders placed before communes have `commune = ""`
+  The "Expédiée" tab is also where "Prête en boutique" pickup orders sit. Orders placed before communes have `commune = ""`
   (their commune is inside `address`). The commune select is a plain list with type-ahead (Tizi Ouzou: 67), no search box.
 - Store name is one value for both languages (FR/AR for tagline, hero title, delivery text only).
 - Product images: no main-image choice or ordering. No order detail page in admin.
@@ -1014,8 +1162,8 @@ Keep this section last; update it when something here gets done or newly found.
   Categories: folds opened by hand close after every save (only the `?open=` group reopens); the old
   `/admin/categories` URL is a 404.
 - WhatsApp button only on product pages (admin orders have a per-customer WhatsApp link).
-- Admin on phones: Stock's sort toggle and Commandes' sortable headers live in the (hidden) table header, so
-  phones get the default order only (lowest stock first / newest first; sort chips in the Filtres fold would fix it); inventory saves one row per click and reload. Produits list still
+- Admin on phones: Stock's sort toggle lives in the (hidden) table header, so phones get the default order only
+  (lowest stock first; a sort select like Commandes' would fix it); inventory saves one row per click and reload. Produits list still
   scrolls sideways a little (487px, read-only).
 - A Livrée/Retournée/Annulée set by mistake can only be undone in the DB (`npx prisma studio`; on a return or
   cancel, take the stock back by hand too). A stale tab picking a status on an order finalized elsewhere (or

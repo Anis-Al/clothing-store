@@ -67,9 +67,9 @@ export async function checkout(lines: { variantId: string; qty: number; price: n
   const phone = normalizePhone(String(shipping?.phone ?? ""))
   if (!phone) return { error: t.cart.badPhone }
 
-  const { pickupEnabled, stopdeskEnabled } = await getSettings()
+  const { homeEnabled, pickupEnabled, stopdeskEnabled } = await getSettings()
   // method switched off since the cart loaded: same path as a fee change (the cart refreshes without the option)
-  if ((pickup && !pickupEnabled) || (desk && !stopdeskEnabled)) return { error: t.errors.priceChanged, prices: {} }
+  if ((pickup && !pickupEnabled) || (desk && !stopdeskEnabled) || (method === "HOME" && !homeEnabled)) return { error: t.errors.priceChanged, prices: {} }
   const tariff = pickup ? null : await db.wilayaFee.findUnique({ where: { wilaya } })
   const shippingFee = pickup ? 0 : desk ? (tariff?.desk ?? 0) : (tariff?.home ?? 0)
   try {

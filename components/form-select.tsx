@@ -1,5 +1,5 @@
 "use client"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // `label` shows in the trigger; `option` (default `label`) in the list. Consecutive items with the
@@ -28,6 +28,9 @@ export function FormSelect({
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [resets, setResets] = useState(0)
+  // inside a modal <dialog> the popup must be portalled into the dialog, or it renders under the top layer
+  const [container, setContainer] = useState<HTMLElement | null>(null)
+  useEffect(() => setContainer(input.current?.closest("dialog") ?? null), [])
   const runs: { group?: string; items: Item[] }[] = []
   for (const i of items) {
     const last = runs.at(-1)
@@ -56,7 +59,7 @@ export function FormSelect({
       <SelectTrigger size={size} className={className} aria-label={ariaLabel}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent alignItemWithTrigger={false}>
+      <SelectContent alignItemWithTrigger={false} container={container ?? undefined}>
         {runs.flatMap((r) => r.group ? [
           <SelectGroup key={`group:${r.group}`} className="p-0">
             {/* sticky: the heading stays on top while its group scrolls under it (-top-1.5 = the popup's padding) */}

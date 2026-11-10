@@ -1,112 +1,124 @@
 import Link from "next/link"
-import { ChevronDown, CornerDownRight, Trash2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { EyeOff, Plus, Trash2 } from "lucide-react"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
-import { ConfirmButton } from "@/components/admin/client"
-import { Field, Notice, SettingsNav } from "@/components/admin/fields"
-import { FormSelect } from "@/components/form-select"
+import { ConfirmButton, NoteInput } from "@/components/admin/client"
+import { Help, Notice, SettingsNav } from "@/components/admin/fields"
 import { createCategory, deleteCategory, updateCategory } from "@/lib/actions/admin"
 import { db } from "@/lib/db"
-import { getI18n } from "@/lib/i18n"
+import { fill, getI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
+// One soft-cloud card per main category, its sub-categories listed inside (two levels, nothing folded).
+// Read-only until "Modifier" (?edit=1): names become inline fields (Enter or leaving the field saves), empty categories
+// get a delete button, each card gets an "add a sub-category" field, and a field on top adds a main category.
+// The actions keep `edit` (and `debug`) through the referer, so the admin stays in edit mode after each save.
 export default async function Categories({ searchParams }: PageProps<"/admin/settings/categories">) {
   const [{ t }, all, sp] = await Promise.all([
     getI18n(),
     db.category.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { products: true, children: true } } } }),
     searchParams,
   ])
+  const debug = sp.debug === "1"
+  const edit = sp.edit === "1"
+  const href = (on: boolean) => {
+    const q = new URLSearchParams()
+    if (debug) q.set("debug", "1")
+    if (on) q.set("edit", "1")
+    return `/admin/settings/categories${q.size ? `?${q}` : ""}`
+  }
+  type Cat = (typeof all)[number]
   const mains = all.filter((c) => !c.parentId)
   const subsOf = (id: string) => all.filter((s) => s.parentId === id)
-  const total = (c: (typeof all)[number]) => c._count.products + subsOf(c.id).reduce((n, s) => n + s._count.products, 0)
-  const parentItems = (self?: string) => [
-    { value: "", label: t.admin.topLevel },
-    ...mains.filter((m) => m.id !== self).map((m) => ({ value: m.id, label: m.name })),
-  ]
+  const total = (c: Cat) => c._count.products + subsOf(c.id).reduce((n, s) => n + s._count.products, 0)
+  // inline name field: reads as text, dashed underline on hover, ink underline while typing
+  const nameField = "w-full min-w-0 border-b border-dashed border-transparent bg-transparent outline-none hover:border-hairline focus:border-solid focus:border-ink"
 
-  const row = (c: (typeof all)[number]) => {
-    const n = total(c)
-    const isSub = !!c.parentId
-    return (
-      <TableRow key={c.id} className={cn(!isSub && "bg-cloud/60")}>
-        <TableCell className="max-md:basis-full">
-          <form action={updateCategory.bind(null, c.id)} className={cn("flex flex-wrap items-center gap-2", isSub && "ps-6")}>
-            {isSub && <CornerDownRight className="size-4 text-mute rtl:-scale-x-100" />}
-            <Input name="name" required maxLength={60} defaultValue={c.name} aria-label={t.admin.name}
-              className={cn("h-10 w-52 max-md:grow", !isSub && "font-medium")} />
-            {/* a main category with sub-categories must stay main (two levels max) */}
-            {c._count.children ? (
-              <input type="hidden" name="parentId" value="" />
-            ) : (
-              <FormSelect name="parentId" size="sm" defaultValue={c.parentId} placeholder={t.admin.topLevel}
-                aria-label={t.admin.parentCategory} items={parentItems(c.id)} className="w-52 max-md:w-32 max-md:grow" />
-            )}
-            <Button type="submit" size="sm" variant="secondary">{t.admin.save}</Button>
-          </form>
-        </TableCell>
-        <TableCell>
-          {n ? (
-            <Link href={`/admin/products?category=${c.id}`} aria-label={`${t.admin.products} · ${n}`}
-              className="font-medium tabular-nums underline underline-offset-4">{n}</Link>
-          ) : (
-            <span className="text-sm text-mute">0 · {t.admin.hiddenInStore}</span>
-          )}
-        </TableCell>
-        <TableCell className="max-md:hidden">
-          <Link href={`/products?category=${c.slug}`} dir="ltr" className="font-mono text-xs text-mute hover:underline">?category={c.slug}</Link>
-        </TableCell>
-        <TableCell className="max-md:ms-auto">
-          {/* only empty categories can be deleted (the action re-checks) */}
-          {!c._count.products && !c._count.children && (
-            <form action={deleteCategory.bind(null, c.id)}>
-              <ConfirmButton message={t.admin.confirmDelete} aria-label={t.admin.delete}
-                className="grid size-10 place-items-center rounded-full text-mute hover:bg-cloud hover:text-sale">
-                <Trash2 className="size-5" />
-              </ConfirmButton>
-            </form>
-          )}
-        </TableCell>
-      </TableRow>
-    )
-  }
+  // product count (links to the admin list) or, at 0, the "hidden in the shop" eye
+  const count = (c: Cat, n: number) => n ? (
+    <Link href={`/admin/products?category=${c.id}`} aria-label={`${t.admin.products} · ${n}`}
+      className="shrink-0 text-sm tabular-nums text-mute hover:text-ink hover:underline">{n}</Link>
+  ) : (
+    <span title={t.admin.hiddenInStore} className="shrink-0 text-mute">
+      <EyeOff className="size-4" aria-hidden /><span className="sr-only">{t.admin.hiddenInStore}</span>
+    </span>
+  )
+
+  const name = (c: Cat, big = false) => edit ? (
+    <form action={updateCategory.bind(null, c.id)} className="min-w-0 flex-1">
+      {/* rename only: the parent stays (moving = delete + re-add under the other card) */}
+      <input type="hidden" name="parentId" value={c.parentId ?? ""} />
+      <NoteInput name="name" required maxLength={60} defaultValue={c.name} aria-label={t.admin.name}
+        className={cn(nameField, big ? "h-8 text-lg font-medium" : "h-7 text-sm")} />
+    </form>
+  ) : (
+    <span className={cn("min-w-0 flex-1 truncate", big ? "text-lg font-medium leading-8" : "text-sm leading-7")}>{c.name}</span>
+  )
+
+  // only empty categories can be deleted (the action re-checks)
+  const remove = (c: Cat) => edit && !c._count.products && !c._count.children && (
+    <form action={deleteCategory.bind(null, c.id)}>
+      <ConfirmButton message={t.admin.confirmDelete} aria-label={t.admin.delete}
+        className="grid size-8 place-items-center rounded-full text-mute hover:bg-canvas hover:text-sale">
+        <Trash2 className="size-4" />
+      </ConfirmButton>
+    </form>
+  )
 
   return (
-    <div className="flex max-w-5xl flex-col gap-6">
-      <SettingsNav t={t} active="categories" />
+    <div className="flex max-w-6xl flex-col gap-6">
+      <SettingsNav t={t} active="categories" debug={debug} />
       <Notice t={t} sp={searchParams} />
 
-      <form action={createCategory} className="flex flex-wrap items-end gap-2">
-        <Field label={t.admin.newCategory}>
-          <Input name="name" required maxLength={60} placeholder="Vestes, Polos…" className="w-64" />
-        </Field>
-        <Field label={t.admin.parentCategory} hint={t.admin.categoriesHint}>
-          <FormSelect name="parentId" placeholder={t.admin.topLevel} items={parentItems()} className="w-64" />
-        </Field>
-        <Button type="submit">{t.admin.add}</Button>
-      </form>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {edit ? (
+          <form action={createCategory} className="flex items-center gap-2">
+            <Input name="name" required maxLength={60} placeholder={t.admin.newCategory} aria-label={t.admin.newCategory} className="h-10 w-64" />
+            <Button type="submit" size="sm">{t.admin.add}</Button>
+          </form>
+        ) : (
+          <p className="flex items-center gap-1.5 text-sm text-mute">
+            {fill(t.admin.catSummary, { main: mains.length, sub: all.length - mains.length })}
+            <Help text={t.admin.categoriesHint} />
+          </p>
+        )}
+        <Link href={href(!edit)} className={buttonVariants({ variant: edit ? "default" : "secondary", size: "sm" })}>
+          {edit ? t.admin.finish : t.admin.edit}
+        </Link>
+      </div>
 
-      {/* One fold per main category: folded = name, its sub-categories, product count; open = the edit rows.
-          Next remounts the page when the search params change, so after a save only ?open= is unfolded. */}
-      <div className="border-t border-hairline">
+      <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
         {mains.map((m) => {
-          const n = total(m)
+          const subs = subsOf(m.id)
           return (
-            <details key={m.id} open={sp.open === m.id} className="group border-b border-hairline">
-              <summary className="flex cursor-pointer list-none items-center gap-4 py-4 [&::-webkit-details-marker]:hidden">
-                <span className="flex min-w-0 flex-1 flex-col gap-1 md:flex-row md:items-baseline md:gap-4">
-                  <span className="text-lg font-medium">{m.name}</span>
-                  <span className="truncate text-sm text-mute">{subsOf(m.id).map((s) => s.name).join(", ")}</span>
-                </span>
-                <span className="shrink-0 text-sm text-mute tabular-nums">
-                  {n ? `${t.admin.products} · ${n}` : t.admin.hiddenInStore}
-                </span>
-                <ChevronDown className="size-5 shrink-0 transition-transform group-open:rotate-180" />
-              </summary>
-              <Table stack className="mb-4">
-                <TableBody>{[m, ...subsOf(m.id)].map(row)}</TableBody>
-              </Table>
-            </details>
+            <section key={m.id} className="flex flex-col gap-3 rounded-2xl bg-cloud p-5">
+              <header className="flex items-center gap-3">
+                {name(m, true)}
+                {count(m, total(m))}
+                {remove(m)}
+              </header>
+              {!!subs.length && (
+                <ul className="divide-y divide-hairline border-t border-hairline">
+                  {subs.map((s) => (
+                    <li key={s.id} className="flex min-h-10 items-center gap-3 py-1.5">
+                      {name(s)}
+                      {count(s, s._count.products)}
+                      {remove(s)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {edit && (
+                <form action={createCategory} className={cn("flex items-center gap-2", !subs.length && "border-t border-hairline pt-3")}>
+                  <input type="hidden" name="parentId" value={m.id} />
+                  <input name="name" required maxLength={60} placeholder={t.admin.newSub} aria-label={t.admin.newSub}
+                    className={cn(nameField, "h-7 text-sm placeholder:text-mute")} />
+                  <button type="submit" aria-label={t.admin.add} className="grid size-8 shrink-0 place-items-center rounded-full text-mute hover:bg-canvas hover:text-ink">
+                    <Plus className="size-4" />
+                  </button>
+                </form>
+              )}
+            </section>
           )
         })}
       </div>

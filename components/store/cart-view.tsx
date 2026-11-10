@@ -27,9 +27,9 @@ function savedShipping(): Partial<Shipping> {
 }
 
 // fees: per wilaya [home, relay point] from Réglages › Livraison (checkout refuses the order if the fee changed since).
-// pickup: "Retrait en boutique" offered (Réglages › Livraison); storeAddress (Boutique tab) is shown with it when set.
-// desks: relay points (Réglages › Transporteur); none = stop-desk not offered.
-export function CartView({ fees, pickup, storeAddress, desks }: { fees: Record<string, [number, number]>; pickup: boolean; storeAddress: string; desks: Desk[] }) {
+// home / pickup: methods offered (Réglages › Livraison); storeAddress (Boutique tab) is shown with pickup when set.
+// desks: relay points (Réglages › Livraison); none = stop-desk not offered. Réglages keeps at least one method on.
+export function CartView({ fees, home, pickup, storeAddress, desks }: { fees: Record<string, [number, number]>; home: boolean; pickup: boolean; storeAddress: string; desks: Desk[] }) {
   const { t, locale } = useT()
   const { items, setQty, remove, reprice, clear } = useCart()
   const router = useRouter()
@@ -47,9 +47,9 @@ export function CartView({ fees, pickup, storeAddress, desks }: { fees: Record<s
 
   if (!mounted) return <div className="min-h-[50vh]" />
   const shipping = savedShipping()
-  const methods: Method[] = ["HOME", ...(pickup ? (["PICKUP"] as const) : []), ...(desks.length ? (["STOPDESK"] as const) : [])]
-  const wanted = method ?? shipping.method ?? "HOME"
-  const m: Method = methods.includes(wanted) ? wanted : "HOME" // a saved method the shop no longer offers falls back
+  const methods: Method[] = [...(home ? (["HOME"] as const) : []), ...(pickup ? (["PICKUP"] as const) : []), ...(desks.length ? (["STOPDESK"] as const) : [])]
+  const wanted = method ?? shipping.method ?? methods[0] ?? "HOME"
+  const m: Method = methods.includes(wanted) ? wanted : (methods[0] ?? "HOME") // a saved method the shop no longer offers falls back
   const w = wilaya ?? shipping.wilaya ?? ""
   const communes = communesOf(w)
   const deskWilayas = new Set(desks.map((d) => d.wilaya))
@@ -189,7 +189,7 @@ export function CartView({ fees, pickup, storeAddress, desks }: { fees: Record<s
                   {t.cart.desk}
                   <FormSelect key={w} name="stopDeskId" required disabled={!wDesks.length} placeholder={t.cart.chooseDesk} onChange={setDesk}
                     defaultValue={sel?.id}
-                    items={wDesks.map((d) => ({ value: d.id, label: d.name, option: `${d.name} — ${d.address}` }))} />
+                    items={wDesks.map((d) => ({ value: d.id, label: d.name }))} />
                 </label>
               </>
             )}

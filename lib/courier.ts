@@ -1,4 +1,4 @@
-import type { Order, OrderItem, Product, ProductVariant, StopDesk } from "@prisma/client"
+import type { Order, OrderItem, OrderStatus, Product, ProductVariant, StopDesk } from "@prisma/client"
 import { courierOf } from "@/lib/couriers"
 
 // Parcel creation through dzship (freeship.dzbuild.com): a free gateway with one request shape for ~100 Algerian
@@ -48,26 +48,61 @@ export function parcelFor(o: OrderToSend) {
 }
 
 export type ParcelResult = { ok: true; tracking: string; labelUrl: string } | { ok: false; message: string }
+type Failure = { ok: false; message: string }
 
-export async function createParcel(parcel: ReturnType<typeof parcelFor>, s: CourierSettings): Promise<ParcelResult> {
+// One POST to the gateway with the shop's courier + credentials (+ origin wilaya). Network errors and gateway
+// refusals both come back as { ok: false, message } (the message, plus the fields it names, goes to the toast).
+async function call(path: string, s: CourierSettings, extra: object): Promise<{ ok: true; j: Record<string, unknown> } | Failure> {
   const body = {
     courier: s.courier,
     credentials: parseKeys(s.courierKeys),
     ...(s.courierFromWilaya && { options: { fromWilaya: Number(s.courierFromWilaya.slice(0, 2)) } }),
-    order: parcel,
+    ...extra,
   }
   let r: Response
   try {
-    r = await fetch(`${GATEWAY}/v1/orders`, {
+    r = await fetch(`${GATEWAY}${path}`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(30_000),
     })
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
-  const j = (await r.json().catch(() => ({}))) as { trackingNumber?: unknown; labelUrl?: unknown; error?: { message?: string; fields?: Record<string, unknown> } }
-  if (!r.ok || typeof j.trackingNumber !== "string") {
+  const j = (await r.json().catch(() => ({}))) as Record<string, unknown> & { error?: { message?: string; fields?: Record<string, unknown> } }
+  if (!r.ok || j.error) {
     const fields = Object.entries(j.error?.fields ?? {}).map(([k, v]) => `${k.replace(/^order\.(recipient\.)?/, "")}: ${v}`).join(", ")
     return { ok: false, message: [j.error?.message ?? `HTTP ${r.status}`, fields].filter(Boolean).join(" — ") }
   }
-  return { ok: true, tracking: j.trackingNumber, labelUrl: typeof j.labelUrl === "string" ? j.labelUrl : "" }
+  return { ok: true, j }
+}
+
+export async function createParcel(parcel: ReturnType<typeof parcelFor>, s: CourierSettings): Promise<ParcelResult> {
+  const res = await call("/v1/orders", s, { order: parcel })
+  if (!res.ok) return res
+  if (typeof res.j.trackingNumber !== "string") return { ok: false, message: "no trackingNumber" }
+  return { ok: true, tracking: res.j.trackingNumber, labelUrl: typeof res.j.labelUrl === "string" ? res.j.labelUrl : "" }
+}
+
+// dzship's tracking: the parcel's status in its one vocabulary for every courier (docs/statuses.md in the dzship
+// zip: created → pending_pickup → picked_up → in_transit → at_hub → out_for_delivery → delivery_attempted →
+// delivered, or on_hold | returned | return_in_transit | cancelled | lost | unknown) + the courier's own wording.
+export type TrackResult = { ok: true; status: string; raw: string } | Failure
+
+export async function trackParcel(trackingNumber: string, s: CourierSettings): Promise<TrackResult> {
+  const res = await call("/v1/track", s, { trackingNumber })
+  if (!res.ok) return res
+  const events = Array.isArray(res.j.events) ? (res.j.events as { rawStatus?: unknown }[]) : []
+  const raw = events.at(-1)?.rawStatus // oldest first
+  return { ok: true, status: typeof res.j.status === "string" ? res.j.status : "unknown", raw: typeof raw === "string" ? raw : "" }
+}
+
+// What a courier status does to the order. Only moves forward, only on open orders: a parcel on its way makes a
+// pending / confirmed order SHIPPED, delivered → DELIVERED, returned → RETURNED (via SHIPPED, the only status a return
+// leaves from). cancelled / lost / on_hold and the early statuses change nothing: the admin decides (call the customer…).
+const MOVING = ["picked_up", "in_transit", "at_hub", "out_for_delivery", "delivery_attempted", "return_in_transit", "returned", "delivered"]
+export function statusSteps(courierStatus: string, current: OrderStatus): OrderStatus[] {
+  if (!["PENDING", "CONFIRMED", "SHIPPED"].includes(current) || !MOVING.includes(courierStatus)) return []
+  const steps: OrderStatus[] = current === "SHIPPED" ? [] : ["SHIPPED"]
+  if (courierStatus === "delivered") return ["DELIVERED"] // DELIVERED is allowed from any open status
+  if (courierStatus === "returned") return [...steps, "RETURNED"]
+  return steps
 }

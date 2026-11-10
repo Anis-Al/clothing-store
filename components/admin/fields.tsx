@@ -82,25 +82,28 @@ export async function Notice({ t, sp }: { t: Dict; sp: Promise<Record<string, st
 const chip = (on: boolean) =>
   cn("inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium whitespace-nowrap", on ? "border-ink bg-ink text-canvas" : "border-hairline hover:border-ink")
 
-// Réglages = one tab per short form (?tab=, same page; Transporteur also holds the relay points) + Catégories
+// Réglages = one tab per short form (?tab=, same page; Livraison also holds the courier, tariff and relay points) + Catégories
 // (own route: its own forms per row).
-export const SETTINGS_TABS = ["store", "home", "delivery", "courier"] as const
+export const SETTINGS_TABS = ["store", "home", "delivery"] as const
 export type SettingsTab = (typeof SETTINGS_TABS)[number] | "categories"
 
-export function SettingsNav({ t, active }: { t: Dict; active: SettingsTab }) {
+// `debug` (?debug=1, like Odoo's developer mode) shows technical fields; every tab link keeps it.
+export function SettingsNav({ t, active, debug }: { t: Dict; active: SettingsTab; debug?: boolean }) {
   const tabs: [SettingsTab, string, string][] = [
     ["store", t.admin.sStore, "/admin/settings"],
     ["home", t.admin.sHome, "/admin/settings?tab=home"],
     ["delivery", t.admin.delivery, "/admin/settings?tab=delivery"],
-    ["courier", t.admin.sCourier, "/admin/settings?tab=courier"],
     ["categories", t.admin.categories, "/admin/settings/categories"],
   ]
   return (
     <>
-      <h1 className="text-[32px] font-medium">{t.admin.settings}</h1>
+      <h1 className="text-[32px] font-medium">
+        {t.admin.settings}
+        {debug && <span className="ms-3 rounded-full bg-cloud px-3 py-1 font-mono text-sm text-mute align-middle">debug</span>}
+      </h1>
       <nav aria-label={t.admin.settings} className="flex flex-wrap gap-2 border-b border-hairline pb-6">
         {tabs.map(([k, label, href]) => (
-          <Link key={k} href={href} aria-current={k === active ? "page" : undefined} className={chip(k === active)}>{label}</Link>
+          <Link key={k} href={debug ? `${href}${href.includes("?") ? "&" : "?"}debug=1` : href} aria-current={k === active ? "page" : undefined} className={chip(k === active)}>{label}</Link>
         ))}
       </nav>
     </>
