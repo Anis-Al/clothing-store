@@ -61,7 +61,7 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   `SHIPPED → RETURNED` (parcel refused / not collected, set once it is back in the shop), or `CANCELLED`.
   The enum's declaration order is the admin's display order (`Object.values(OrderStatus)`).
   `DELIVERED`, `RETURNED` and `CANCELLED` are **final** (`FINAL_STATUSES` in `lib/utils.ts`): `updateOrderStatus`
-  only writes to an open order (`RETURNED` only to a `SHIPPED` one), the order card shows no buttons on final orders (its status chip says it),
+  only writes to an open order (`RETURNED` only to a `SHIPPED` one), the order row shows no buttons on final orders (its status chip says it),
   and every button leading to a final status asks first (`ConfirmButton`, `t.admin.confirmFinal`).
   Status changes are **next-step buttons** (`stepsOf()` in the orders page): one main button for the usual next step
   (Confirmer → Expédier / Marquer prête → Marquer livrée / retirée), the rest in a "⋯" menu (`MoreMenu`, native
@@ -75,15 +75,19 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   shows it as a bottom-end toast. Keep the page's own params in that redirect (settings `tab`, list
   filters, orders `back`, categories `open`), or the admin lands somewhere else after each save.
 - **Commandes URL** (`/admin/orders`): `status`, `method` (`HOME|PICKUP|STOPDESK`), `q`, `sort` (`date|wilaya|total` +
-  `-asc|-desc`, none = newest first; picked from a select, "date-desc" = none), `from` / `to` (YYYY-MM-DD), `page` (3 orders per page, `PER_PAGE`).
+  `-asc|-desc`, none = newest first; picked from a select, "date-desc" = none), `from` / `to` (YYYY-MM-DD), `page` (8 rows per page, 5 cards on phones: `PER_PAGE` / `PER_PAGE_PHONE`).
   Every tab, pager link and every `back` passed to the status / note / courier actions comes from `href(patch)` in the
   page; the GET forms carry the rest with `keep(...)`. A new param goes into `cur` there, or saves and tab switches drop it.
-  Layout: one card per order (status · ref · date, then customer + call / WhatsApp + note · delivery + courier ·
-  items · total with its fee + next-step buttons); the status leads the top line as one solid chip in its colour with its own icon (`StatusChip`: `CHIP` + `STATUS_ICON`;
-  tabs keep the bare `TONE` dot), then on desktop a 4-segment `Progress` bar (PENDING → CONFIRMED → SHIPPED → DELIVERED;
-  returned = ink then red, cancelled = empty). Shown once per card.
-  The delivery method is `MethodMark` (ink disc + icon: truck / store / pin): it heads the delivery column with its
-  label on every card (not in the collapsed phone summary: status, date, total, name only).
+  Layout (from the 2026-11-10 mockup): status tab strip, then search · period segments (Tout / Aujourd'hui / 7 j / 30 j /
+  Personnalisé… = the two date fields in a popover) · method · sort, then a bordered **table** from `lg` (`cols` in the
+  page: Commande = status chip + ref + date · Client = name, phone + WhatsApp, note line · Livraison = method · place,
+  courier state chip + parcel number · Articles · Total + "dont livraison" · Actions = next-step button, ⋯, chevron),
+  8 per page, and the same rows as **cards** below `lg` (5 per page, phone sniffed from the headers like Stock). The
+  chevron (`RowToggle`, context from `OrderRow` in `components/admin/client.tsx`) opens a details panel under the row:
+  Livraison (address, courier, parcel number + `CopyButton` + refresh, 4-step timeline), Articles (itemised, sous-total /
+  livraison / total), Note (`NoteInput`). The status chip is solid in its colour with an icon (`StatusChip`); tabs keep the
+  bare `TONE` dot. Footer: "1–8 sur 16" + `Pager`. Not built from the mockup: checkboxes / bulk actions, Exporter, Imprimer,
+  "Action requise", the history log (no data behind them).
 - **Images**: every upload goes through `saveUpload()` (`lib/actions/admin.ts`: jpg/png/webp/avif/gif,
   ≤ 8 MB, no SVG) into `public/uploads/` (created at boot by `instrumentation.ts`), URL
   `/uploads/<Date.now()>-<name>`, kept in `Image` (products) or `Settings.heroImage`. Deleting the row
@@ -591,7 +595,7 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - Dashboard: the 4 tiles stay (big values now proportional figures, no `tabular-nums`), then "Activité"
   with one range filter `?days=7|30|90` (default 30, chips like the admin lists) over four charts:
   orders per day (columns), order value per day excluding cancelled (area, 2px line, 10% wash),
-  orders by status in enum order (horizontal bars), top 5 products by quantity excluding cancelled.
+  orders by status in enum order (horizontal bars; replaced 2026-11-10 by the top wilayas), top 5 products by quantity excluding cancelled.
   No orders in the range → one "Aucune commande sur la période." line instead of empty charts.
 - Day buckets use the server's local date (`toLocaleDateString("en-CA")`); labels formatted on the
   server ("11 oct." / "11 أكتوبر") so SSR and client match. Top products summed in JS (`ponytail` note).
@@ -1390,6 +1394,36 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   and 375; phone closed card 102 → 106px, no overflow. A 500 seen while editing came from the half-applied import
   (`Clock is not defined`), gone after the second edit.
 
+### 2026-11-10 — Dashboard on one screen, "Depuis le début", rare status tabs folded
+- Dashboard (user: "don't want to scroll"): title and range chips share the first row (the "Activité" heading is gone),
+  tiles 2 per row then 4 from `xl` at `px-4 py-3` / `text-2xl`, chart panels `px-4 py-3`, time charts `h-44`, ranking
+  rows 30px. 1280×800: page exactly 800px tall, nothing to scroll. Phones still scroll (four charts can't fit 812px).
+- "Depuis le début" (user: "all time"): `?days=all` = from the first order's day; above 90 days the two time charts
+  switch to one bar per month (`monthly`, titles "Commandes / Montant commandé par mois", ticks "mai 2026").
+  Checked by moving the oldest demo order 200 days back (monthly axis May → Nov), then restored to 2026-10-21.
+- Commandes tab strip (user: Retournée / Annulée "collapsed"): on desktop they sit under a "Plus n ⌄" tab (`RARE`,
+  `MoreMenu` with a `trigger`); while one of them is the filter the tab reads "● Annulée 1", underlined. The strip
+  no longer needs its own sideways scroll. Phones keep them as pills inside the Filtres fold. `MoreMenu` now closes when
+  a link inside it is clicked (soft navigation kept it open).
+
+- Tried and undone (user): desktop orders as collapsed one-line rows (12 per page, a click opened the card). The open
+  cards, 3 per page, stay the desktop layout; only phones collapse them.
+
+- "Commandes par statut" replaced (user: "something more important") by **Wilayas qui commandent le plus**: the top 6
+  destination wilayas over the range, cancelled orders left out, pickup orders as one "Boutique" row (names in the UI
+  language). Same `Ranking` chart; the status split is already on the Commandes tabs. 1280×800 still one screen.
+
+### 2026-11-10 — Commandes rebuilt on the user's mockup
+- User brought `Commandes — refonte liste.html` (a bundled artifact export: fonts + two nested boards, desktop 1440 and
+  mobile 390; unpacked with Python from its gzip/base64 manifest, served from a temp folder to look at it). Rebuilt the
+  page on its structure with our tokens (hairline borders, ink buttons, our status colours): see the Commandes
+  convention. Deleted `OrderCard` (`OrderRow` + `RowToggle` replace it), the `Progress` bar and `MethodMark`.
+- Kept from today's decisions although the mockup differs: Retournée / Annulée stay under "Plus", the status chip stays
+  solid. Skipped on purpose (nothing behind them): selection checkboxes and bulk actions, Exporter, Imprimer les bons,
+  "Action requise", Signaler un incident, the per-step dates and history (only `createdAt` exists).
+- Verified in the pane: 1440 and 1280 (rows 89–97px, no inner scroll, total and button 23px apart), panel open
+  (Livraison / Articles / Note), 375 cards 243px + the stacked panel, Arabic 1280 mirrored. typecheck, lint, tests clean.
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - **SEO, still missing** (simplest first): `metadataBase` from a new `SITE_URL` env var (needed by the rest);
@@ -1423,7 +1457,8 @@ Keep this section last; update it when something here gets done or newly found.
   The "Expédiée" tab is also where "Prête en boutique" pickup orders sit. Orders placed before communes have `commune = ""`
   (their commune is inside `address`). The commune select is a plain list with type-ahead (Tizi Ouzou: 67), no search box.
 - Store name is one value for both languages (FR/AR for tagline, hero title, delivery text only).
-- Product images: no main-image choice or ordering. No order detail page in admin.
+- Product images: no main-image choice or ordering. No separate order page in admin (the details panel on Commandes
+  is the order view; nothing printable yet).
 - Import: CSV only (`.xlsx` would need a dependency such as `read-excel-file`); no catalog export to edit
   and re-import; it can't rename products, change their category/description or delete variants.
 - Product content is single-language (no `nameAr`); add columns if the catalog must be bilingual.

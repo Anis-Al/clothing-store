@@ -15,7 +15,7 @@ const short = (s: string) => (s.length > 18 ? `${s.slice(0, 17)}…` : s)
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex min-w-0 flex-col gap-4 bg-cloud p-6">
+    <section className="flex min-w-0 flex-col gap-2 bg-cloud px-4 py-3">
       <h3 className="font-medium">{title}</h3>
       {children}
     </section>
@@ -26,12 +26,12 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 function Ranking({ rows, label }: { rows: Row[]; label: string }) {
   const config = { value: { label, color: INK } } satisfies ChartConfig
   return (
-    <ChartContainer config={config} dir="ltr" className="aspect-auto w-full" style={{ height: rows.length * 40 + 16 }}>
+    <ChartContainer config={config} dir="ltr" className="aspect-auto w-full" style={{ height: rows.length * 30 + 8 }}>
       <BarChart data={rows} layout="vertical" accessibilityLayer margin={{ right: 40 }}>
         <XAxis type="number" dataKey="value" hide allowDecimals={false} />
         <YAxis type="category" dataKey="name" {...axis} width={130} tickFormatter={short} />
         <ChartTooltip content={<ChartTooltipContent />} />
-        <Bar dataKey="value" fill="var(--color-value)" radius={[0, 4, 4, 0]} maxBarSize={24}>
+        <Bar dataKey="value" fill="var(--color-value)" radius={[0, 4, 4, 0]} maxBarSize={20}>
           <LabelList dataKey="value" position="right" className="fill-foreground font-medium" />
         </Bar>
       </BarChart>
@@ -39,17 +39,18 @@ function Ranking({ rows, label }: { rows: Row[]; label: string }) {
   )
 }
 
-export function DashboardCharts({ days, statuses, top }: { days: Day[]; statuses: Row[]; top: Row[] }) {
+export function DashboardCharts({ days, wilayas, top, monthly }: { days: Day[]; wilayas: Row[]; top: Row[]; monthly?: boolean }) {
   const { t, locale } = useT()
   const compact = new Intl.NumberFormat(locale === "ar" ? "ar-DZ" : "fr-DZ", { notation: "compact" })
   const config = { orders: { label: t.admin.orders, color: INK }, amount: { label: t.admin.total, color: INK } } satisfies ChartConfig
 
   if (!days.some((d) => d.orders)) return <p className="bg-cloud p-6 text-mute">{t.admin.noData}</p>
+  const h = "aspect-auto h-44 w-full"
 
   return (
     <div className="grid gap-2 lg:grid-cols-2">
-      <Panel title={t.admin.ordersPerDay}>
-        <ChartContainer config={config} dir="ltr" className="aspect-auto h-56 w-full">
+      <Panel title={monthly ? t.admin.ordersPerMonth : t.admin.ordersPerDay}>
+        <ChartContainer config={config} dir="ltr" className={h}>
           <BarChart data={days} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis dataKey="label" {...axis} minTickGap={24} />
@@ -61,8 +62,8 @@ export function DashboardCharts({ days, statuses, top }: { days: Day[]; statuses
       </Panel>
 
       {/* separate chart, not a second y-axis on the one above: counts and dinars don't share a scale */}
-      <Panel title={t.admin.amountPerDay}>
-        <ChartContainer config={config} dir="ltr" className="aspect-auto h-56 w-full">
+      <Panel title={monthly ? t.admin.amountPerMonth : t.admin.amountPerDay}>
+        <ChartContainer config={config} dir="ltr" className={h}>
           <AreaChart data={days} accessibilityLayer margin={{ right: 8 }}>
             <CartesianGrid vertical={false} />
             <XAxis dataKey="label" {...axis} minTickGap={24} />
@@ -79,8 +80,8 @@ export function DashboardCharts({ days, statuses, top }: { days: Day[]; statuses
         </ChartContainer>
       </Panel>
 
-      <Panel title={t.admin.byStatus}>
-        <Ranking rows={statuses} label={t.admin.orders} />
+      <Panel title={t.admin.byWilaya}>
+        <Ranking rows={wilayas} label={t.admin.orders} />
       </Panel>
 
       <Panel title={t.admin.topProducts}>

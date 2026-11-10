@@ -1,9 +1,9 @@
 "use client"
 // Tiny client helpers for otherwise server-rendered admin forms.
-import { useActionState, useEffect, useRef, useState } from "react"
+import { createContext, useActionState, useContext, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronDown, MoreHorizontal, X } from "lucide-react"
+import { Check, ChevronDown, Copy, MoreHorizontal, X } from "lucide-react"
 import { cn } from "cn"
 import { useT } from "@/components/i18n-provider"
 import { Button } from "@/components/ui/button"
@@ -20,7 +20,9 @@ export function NoteInput(props: React.ComponentProps<"input">) {
 
 // "⋯" menu: a native <details> whose panel holds server-rendered buttons (e.g. other status changes). Closes on a
 // click outside it or on Escape; a submit inside redirects, which remounts the page anyway.
-export function MoreMenu({ label, children, triggerClassName }: { label: string; children: React.ReactNode; triggerClassName?: string }) {
+export function MoreMenu({ label, children, triggerClassName, trigger }: {
+  label: string; children: React.ReactNode; triggerClassName?: string; trigger?: React.ReactNode
+}) {
   const ref = useRef<HTMLDetailsElement>(null)
   useEffect(() => {
     const close = (e: Event) => { const d = ref.current; if (d?.open && !d.contains(e.target as Node)) d.open = false }
@@ -31,12 +33,16 @@ export function MoreMenu({ label, children, triggerClassName }: { label: string;
   }, [])
   return (
     <details ref={ref} className="relative">
-      <summary aria-label={label} title={label}
-        className={cn("grid size-9 cursor-pointer list-none place-items-center rounded-full [&::-webkit-details-marker]:hidden",
+      {/* default: a round "⋯" button; `trigger` replaces its content (and its look comes from triggerClassName) */}
+      <summary aria-label={trigger ? undefined : label} title={trigger ? undefined : label}
+        className={cn("cursor-pointer list-none [&::-webkit-details-marker]:hidden",
+          !trigger && "grid size-9 place-items-center rounded-full",
           triggerClassName ?? "border border-hairline hover:border-ink")}>
-        <MoreHorizontal className="size-4" />
+        {trigger ?? <MoreHorizontal className="size-4" />}
       </summary>
-      <div className="absolute end-0 top-full z-40 mt-1 flex min-w-52 flex-col rounded-[18px] bg-canvas p-1.5 text-ink ring-1 ring-hairline">{children}</div>
+      {/* a link inside navigates softly (the DOM stays): close the menu on the click */}
+      <div onClick={(e) => { if ((e.target as Element).closest("a") && ref.current) ref.current.open = false }}
+        className="absolute end-0 top-full z-40 mt-1 flex min-w-52 flex-col rounded-[18px] bg-canvas p-1.5 text-ink ring-1 ring-hairline">{children}</div>
     </details>
   )
 }
@@ -50,31 +56,40 @@ export function AdminNavLink({ href, className, activeClassName, children }: {
   return <Link href={href} aria-current={on ? "page" : undefined} className={cn(className, on && activeClassName)}>{children}</Link>
 }
 
-// Order card on phones: collapsed to one summary row (status, name, total) + the next-step button; a tap on the row
-// unfolds the full card (`children`, server-rendered). From md up the summary row is hidden and the card always open.
-// A save redirects and remounts the page, so every card starts collapsed again.
-export function OrderCard({ top, bottom, action, label, className, children }: {
-  top: React.ReactNode; bottom: React.ReactNode; action?: React.ReactNode; label: string; className?: string; children: React.ReactNode
-}) {
+// Order row (Commandes): the row itself is server-rendered; a click on its RowToggle (anywhere inside, through context)
+// mounts the details panel under it. Desktop: a table row + a panel; phones: a card + the same panel.
+const RowCtx = createContext<{ open: boolean; toggle: () => void } | null>(null)
+export function OrderRow({ className, panel, children }: { className?: string; panel: React.ReactNode; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
-  const shown = !open && !!action
   return (
-    <li className={className}>
-      {/* the whole summary is one tap target; the action sits over its bottom-end corner (a sibling, not nested) */}
-      <div className="relative md:hidden">
-        <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={label}
-          className="flex w-full flex-col gap-4 text-start">
-          {/* chevron at the start: at the end it sat right above the action button */}
-          <span className="flex w-full items-center gap-2 text-sm">
-            <ChevronDown className={cn("-ms-1 size-4 shrink-0 text-mute transition-transform", open && "rotate-180")} />
-            {top}
-          </span>
-          <span className={cn("flex w-full min-w-0 items-baseline gap-3 ps-5", shown && "min-h-9 items-center pe-32")}>{bottom}</span>
-        </button>
-        {shown && <div className="absolute end-0 bottom-0">{action}</div>}
-      </div>
-      <div className={cn(open ? "max-md:mt-3 max-md:border-t max-md:border-hairline-soft max-md:pt-3" : "max-md:hidden")}>{children}</div>
-    </li>
+    <RowCtx.Provider value={{ open, toggle: () => setOpen(!open) }}>
+      <li className={className} data-open={open || undefined}>
+        {children}
+        {open && panel}
+      </li>
+    </RowCtx.Provider>
+  )
+}
+export function RowToggle({ label, hideLabel, className }: { label: string; hideLabel: string; className?: string }) {
+  const row = useContext(RowCtx)
+  if (!row) return null
+  return (
+    <button type="button" onClick={row.toggle} aria-expanded={row.open} aria-label={row.open ? hideLabel : label} title={row.open ? hideLabel : label}
+      className={cn("grid size-10 shrink-0 place-items-center rounded-full text-mute hover:bg-cloud hover:text-ink", className)}>
+      <ChevronDown className={cn("size-4 transition-transform", row.open && "rotate-180")} />
+    </button>
+  )
+}
+
+// Copies a short text (a parcel number) to the clipboard; the icon turns into a check for a moment.
+export function CopyButton({ text, label }: { text: string; label: string }) {
+  const [done, setDone] = useState(false)
+  return (
+    <button type="button" aria-label={label} title={label}
+      onClick={() => navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500) })}
+      className="grid size-8 shrink-0 place-items-center rounded-full text-mute hover:bg-cloud hover:text-ink">
+      {done ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+    </button>
   )
 }
 
