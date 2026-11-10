@@ -60,8 +60,12 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   `SHIPPED → RETURNED` (parcel refused / not collected, set once it is back in the shop), or `CANCELLED`.
   The enum's declaration order is the admin's display order (`Object.values(OrderStatus)`).
   `DELIVERED`, `RETURNED` and `CANCELLED` are **final** (`FINAL_STATUSES` in `lib/utils.ts`): `updateOrderStatus`
-  only writes to an open order (`RETURNED` only to a `SHIPPED` one; the select offers it only there), the
-  orders page shows a badge instead of the select, and picking a final status asks first (`FormSelect confirm`).
+  only writes to an open order (`RETURNED` only to a `SHIPPED` one), the orders page shows a badge on final orders,
+  and every button leading to a final status asks first (`ConfirmButton`, `t.admin.confirmFinal`).
+  Status changes are **next-step buttons** (`stepsOf()` in the orders page): one main button for the usual next step
+  (Confirmer → Expédier / Marquer prête → Marquer livrée / retirée), the rest in a "⋯" menu (`MoreMenu`, native
+  `<details>`, closes on outside click / Escape): back one step, Colis retourné / Jamais retirée, Annuler. Each is a
+  submit button posting `status=<target>` to `updateOrderStatus`. No status dropdown any more.
   Stock is taken at checkout and given back once on cancel or return (`UNSOLD_STATUSES`) — only through
   `updateOrderStatus`. Revenue counts `DELIVERED` only; charts and best sellers leave `UNSOLD_STATUSES` out.
 - **Writes** are Server Actions (`lib/actions/*`). Every admin action calls `requireAdmin()` itself;
@@ -73,8 +77,10 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   `-asc|-desc`, none = newest first; picked from a select, "date-desc" = none), `from` / `to` (YYYY-MM-DD), `page` (3 orders per page, `PER_PAGE`).
   Every tab, pager link and every `back` passed to the status / note / courier actions comes from `href(patch)` in the
   page; the GET forms carry the rest with `keep(...)`. A new param goes into `cur` there, or saves and tab switches drop it.
-  Layout: one card per order (ref · date · method badge, then customer + call / WhatsApp + note · delivery + courier ·
-  items · total with its fee + status), the card's start edge and the status dots use `TONE` (one colour per status).
+  Layout: one card per order (status · ref · date, then customer + call / WhatsApp + note · delivery + courier ·
+  items · total with its fee + next-step buttons); the status (dot in `TONE`, one colour per status) leads the top line.
+  The delivery method is `MethodMark` (ink disc + icon: truck / store / pin): it heads the delivery column with its
+  label on every card, and sits before the name in the phone summary (label `sr-only` there).
 - **Images**: every upload goes through `saveUpload()` (`lib/actions/admin.ts`: jpg/png/webp/avif/gif,
   ≤ 8 MB, no SVG) into `public/uploads/` (created at boot by `instrumentation.ts`), URL
   `/uploads/<Date.now()>-<name>`, kept in `Image` (products) or `Settings.heroImage`. Deleting the row
@@ -155,7 +161,8 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   `HOME` is a switch too (`Settings.homeEnabled`, default on): `updateSettings` refuses the Livraison form with all three
   methods off (`?error=noMethod`). `checkout`
   derives wilaya/address/fee from the desk row, never from the client. Statuses are shared: on a pickup order the
-  admin select labels `SHIPPED` "Prête en boutique" (`t.admin.readyPickup`); `RETURNED` = not collected (both methods).
+  admin labels `SHIPPED` "Prête en boutique", `DELIVERED` "Retirée", `RETURNED` "Non retirée" (`statusLabel()` in the
+  orders page; tabs and the dashboard keep the generic names).
 - **Checkout price check**: the cart sends the prices and fee it displayed; if any differs from the DB,
   `checkout` refuses (`t.errors.priceChanged`) and returns the current prices, the cart reprices
   (`reprice`) and refreshes (new fee). The customer never orders at a total they didn't see.
@@ -189,8 +196,11 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   labels `t.courierStatus`), `courierRaw` (courier wording, shown for `unknown`), `courierCheckedAt`). The order moves
   forward by `statusSteps()` (`lib/courier.ts`, unit-tested): on its way → `SHIPPED`, delivered → `DELIVERED`, returned →
   `RETURNED` via `SHIPPED`, through the same `moveStatus` as a manual change (stock back once); cancelled / lost / on_hold
-  change nothing. Only for the courier saved in Réglages (`?error=courierOther` otherwise) and open orders. Manual, one
-  order per click (no cron). Switching to a courier's own API later = `createParcel()` only.
+  change nothing. Only for the courier saved in Réglages (`?error=courierOther` otherwise) and open orders. The logic
+  lives in `lib/tracking.ts` (`syncOrder`, `syncAll`, `moveStatus`, `trackable`; no Next imports) and runs three ways:
+  the per-card refresh, "Tout actualiser" on Commandes (`trackAll`, toast "n colis vérifiés, m commandes avancées"),
+  and `npm run track:sync` (`scripts/track.mts`) from the server's cron (DEPLOY.md §5: every 2 h, 8:00–22:00; skips
+  parcels checked within `TRACK_MIN_AGE_MIN`, default 60; sequential with a pause, ≤ 200 per run). Switching to a courier's own API later = `createParcel()` only.
 
 ## Design system mapping (Nike → this app)
 
@@ -1119,6 +1129,60 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - Slip: `lib/courier.test.ts` was overwritten by a Write meant to create it (the parcel / courierReady tests from
   `e0d9d2b`); restored from git and the new tests appended. 15 tests pass.
 
+### 2026-11-10 — Next-step buttons instead of the status dropdown
+- User asked whether a dropdown of every status was the best way; it isn't (two clicks for the common case, allows
+  skipping or going backwards, hides the next step). Built the proposal: current status with its dot, then one main
+  button for the next step and a "⋯" menu for the rest; final targets confirm first. Pickup orders read "Marquer prête"
+  / "Marquer retirée" / "Jamais retirée", and their final badges "Retirée" / "Non retirée" (user's "sure" covered both).
+  The coloured status strip / start border is gone (design hook: side-tab accent, off the Nike language): the status
+  (dot + label) now leads the card's top line instead, before the ref and date.
+- Verified on demo orders: Yacine (pickup) En attente → Confirmer → Confirmée → Marquer prête → Prête en boutique,
+  menu showed Jamais retirée / Revenir à Confirmée / Annuler; declining the prompt on "Marquer retirée" left it unchanged;
+  outside click closed the menu; walked back to En attente through the menu. 375px FR + AR: menu panel on screen, no
+  sideways scroll. Demo data left as it was.
+
+### 2026-11-10 — Phones: collapsed order cards, compact admin header
+- User: only ~1.5 order cards fit on a phone screen. Admin header (190px) + title/search (150px) left ~470px for
+  300px cards. Now on phones each card is collapsed (`OrderCard`, client, `components/admin/client.tsx`): a summary
+  "⌄ ● status · date · total / name" with the next-step button over its bottom-end corner (a sibling of the toggle,
+  not nested); a tap unfolds the full card (the summary's action hides, the card's own buttons + ⋯ show). From `md`
+  the summary is hidden and cards are always open. Chevron at the start (user: at the end it sat right above the
+  button). Then (user: lines too close) the two summary lines got a 16px gap, so the total and the button no longer
+  touch. 375px: 98px per card, 3 cards + pager end at ~640px.
+  Opened on a phone, the card no longer repeats what the summary shows (user): its name, date and total are
+  `max-md:hidden`; the fee line "Livraison 850 DA" stays next to the buttons. Desktop unchanged.
+- Admin header on phones (user: "fold the links row into the nav", "we have to scroll horizontally to see
+  Commandes"): one thin bar (store name + "⋯" `MoreMenu` holding Voir la boutique / العربية / Se déconnecter / user)
+  that scrolls away, then a sticky row of five equal tabs, icon + short label (`dashboardShort` "Accueil"), no sideways
+  scroll; `AdminNavLink` (client, `usePathname`) marks the current section on phones and in the desktop sidebar (icons
+  there too, links padding tightened so "Commandes 2" fits). Header 190 → 107px. `MoreMenu` gained `triggerClassName`.
+- Tablet (768px) overflow fixed while at it: the status tab strip needed `min-w-0 max-w-full` to scroll inside itself,
+  the date row wraps at every width, the "Envoyer à <courier>" button wraps (long courier names).
+- Verified at 375 (FR + AR), 768, 1280/1440: no sideways scroll anywhere checked (orders, settings, dashboard), no
+  cut names or tab labels, expand / collapse, ⋯ account menu opens on screen and closes on outside click.
+
+### 2026-11-10 — Delivery method highlighted on order cards
+- User: "highlight the expedition method better, mobile and web". The small grey badge in the top line is gone. Now the
+  method heads the delivery column: an ink disc with its icon (`MethodMark`: À domicile truck, Retrait en boutique
+  store, Point relais pin) + the label at 16px; pickup cards show only that header there (no more "—"). Phone summary:
+  a small disc before the customer's name, the label for screen readers. Desktop columns still aligned at 1440,
+  375px FR + AR no sideways scroll, collapsed cards still 98px.
+- Then (user: "no need to show the wilaya number"): the card's place line is names only, in the UI language
+  (`place()` in the orders page: "Akbou, Béjaïa" / "أقبو، بجاية"), and a commune named like its wilaya shows once
+  ("Oran"). Stored values unchanged ("06 - Béjaïa", Latin commune).
+
+### 2026-11-10 — Scheduled tracking sync
+- User: can "Actualiser le suivi" run on its own; picked cron over an in-app timer (a timer runs twice in dev and stops
+  silently on a restart). Tracking moved out of the server actions into `lib/tracking.ts` so a plain tsx script can run
+  it; `trackOrder` and the new `trackAll` call it, `updateOrderStatus` uses its `moveStatus`. `Notice` now shows
+  `?detail=` under a success toast too (it did only for errors).
+- `scripts/track.mts` imports through the `@/` aliases (tsx reads tsconfig paths; `.ts` extensions break `tsc`). It
+  must not import `lib/i18n.ts` (`next/headers`): it reads `Settings` straight from the DB.
+- Verified: `TRACK_MIN_AGE_MIN=0 npm run track:sync` → "checked 5, moved 0, failed 0" (5 open Sandbox parcels, all
+  already Expédiée); run again with the default hour → "checked 0". "Tout actualiser 5" on Commandes → toast
+  "5 colis vérifiés, 0 commandes avancées."; 375px no sideways scroll (the button sits on its own line under the title).
+  The server's crontab line itself is untested (no server yet).
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - **SEO, still missing** (simplest first): `metadataBase` from a new `SITE_URL` env var (needed by the rest);
@@ -1128,8 +1192,8 @@ Keep this section last; update it when something here gets done or newly found.
   combo is a duplicate URL; default favicon. Arabic is invisible to search engines (locale is a cookie on the
   same URL): only `/ar/...` routes + `hreflang` would fix it.
 - **Courier integration** (done 2026-11-10 through dzship, see Conventions): one-way parcel creation + tracking.
-  Tracking is manual, per order ("Actualiser le suivi"): no scheduled sync, no "refresh all shipped" button, no event
-  history shown (only the last status). Not done: per-wilaya delivery fee
+  Tracking: per order, "Tout actualiser", and a cron script (not running until the server's crontab gets the line);
+  no event history shown (only the last status); Sandbox always says `in_transit`. Not done: per-wilaya delivery fee
   (`POST /v1/rates`), relay points pulled from the courier (`POST /v1/desks`) instead of typed by hand, label
   printing for couriers that return none, a second courier at the same time (one courier per shop today), going to a
   courier's own API (Yalidine: `https://api.yalidine.app/v1/parcels`, headers `X-API-ID` / `X-API-TOKEN`, JSON array

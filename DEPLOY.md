@@ -111,6 +111,7 @@ Run this after any meaningful change, on desktop and at phone width (browser dev
 | Wipe the local DB and start fresh (deletes everything, re-seeds) | `npx prisma migrate reset` |
 | Change a local admin password | `npm run admin:set -- admin "new-password"` |
 | Snapshot the local DB | `npm run db:backup` → `prisma/backups/` |
+| Refresh parcel tracking once (what the server's cron runs) | `npm run track:sync` (`TRACK_MIN_AGE_MIN=0` = no skip) |
 | After editing `prisma/schema.prisma` | `npm run db:migrate -- --name what-changed` |
 
 ### 0.8 Dev gotchas
@@ -339,6 +340,20 @@ Keep copies **off the server** (your PC, another server, cloud storage). A backu
 
 Old DB snapshots pile up in `/app/prisma/backups`; delete old ones from time to time.
 
+### Parcel tracking, automatic
+
+Once a courier is set up (Réglages › Livraison, `?debug=1`), the shop can ask it every few hours where its parcels
+are: orders move to *Expédiée*, *Livrée* or *Retournée* on their own, exactly like the "Actualiser le suivi" button.
+Add one more line to the same crontab (here every 2 hours, 8:00 to 22:00):
+
+```
+0 8-22/2 * * * docker exec atelier npx tsx scripts/track.mts >> /srv/backups/track.log 2>&1
+```
+
+Each run prints one line (`checked 12, moved 3, failed 0`) into `track.log`. It skips parcels checked in the last
+hour (`TRACK_MIN_AGE_MIN`, default 60) and does nothing when no courier is set up. Without Docker:
+`cd /srv/atelier && npm run track:sync`. The "Tout actualiser" button on Commandes does the same on demand.
+
 ### Restore
 
 ```bash
@@ -422,6 +437,7 @@ Apart from the admin screens (Réglages, Catégories, products), every customiza
 | Restart | `docker restart atelier` |
 | Change / add admin | `docker exec atelier npx tsx scripts/admin.mts <user> '<password>'` |
 | Backup now | `docker exec atelier npx tsx scripts/backup.mts` |
+| Refresh parcel tracking now | `docker exec atelier npx tsx scripts/track.mts` |
 | Disk used by data | `docker system df -v` |
 
 ---

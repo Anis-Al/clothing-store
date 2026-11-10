@@ -11,8 +11,9 @@ import { isCommune, isWilaya, WILAYAS, wilayaValue } from "@/lib/wilayas"
 import { decodeText, parseCsv, planImport, type ImportState } from "@/lib/csv"
 import { fill, getI18n, getSettings } from "@/lib/i18n"
 import { MIME, UPLOAD_DIR } from "@/lib/uploads"
-import { DESK_PAGE, FINAL_STATUSES, makeSku, slugify, unique, UNSOLD_STATUSES } from "@/lib/utils"
-import { courierReady, createParcel, parcelFor, parseKeys, statusSteps, trackParcel } from "@/lib/courier"
+import { DESK_PAGE, FINAL_STATUSES, makeSku, slugify, unique } from "@/lib/utils"
+import { courierReady, createParcel, parcelFor, parseKeys } from "@/lib/courier"
+import { moveStatus, syncAll, syncOrder } from "@/lib/tracking"
 import { courierOf } from "@/lib/couriers"
 import { parseDesks, parseFees } from "@/lib/defaults"
 
@@ -383,16 +384,6 @@ export async function updateOrderStatus(orderId: string, back: string, f: FormDa
   redirect(back)
 }
 
-// Only an open order changes: a final one (stale tab, double submit) is left as is,
-// so a cancel or return gives the stock back exactly once. Only a shipped parcel can come back.
-async function moveStatus(tx: Prisma.TransactionClient, orderId: string, to: OrderStatus) {
-  const from = to === "RETURNED" ? "SHIPPED" : { notIn: FINAL_STATUSES }
-  const { count } = await tx.order.updateMany({ where: { id: orderId, status: from }, data: { status: to } })
-  if (!count || !UNSOLD_STATUSES.includes(to)) return
-  for (const i of await tx.orderItem.findMany({ where: { orderId } }))
-    await tx.productVariant.update({ where: { id: i.variantId }, data: { stockCount: { increment: i.quantity } } })
-}
-
 // Creates the parcel on the shop's courier account (lib/courier.ts) and keeps courier + tracking + label on the
 // order. Not for pickup orders, final orders or one already sent. The status is left to the admin (SHIPPED once collected).
 export async function sendToCourier(orderId: string, back: string) {
@@ -429,14 +420,25 @@ export async function trackOrder(orderId: string, back: string) {
   if (!o || !o.tracking || o.tracking === "…" || FINAL_STATUSES.includes(o.status)) redirect(back)
   // the credentials in Réglages belong to the current courier: a parcel made with another one can't be asked about
   if (o.courier !== s.courier) fail("courierOther")
-  const res = await trackParcel(o.tracking, s)
+  const res = await syncOrder(o, s) // lib/tracking.ts, same as the scheduled sync
   if (!res.ok) fail("courierTrack", res.message)
-  else await db.$transaction(async (tx) => {
-    await tx.order.update({ where: { id: orderId }, data: { courierStatus: res.status, courierRaw: res.raw, courierCheckedAt: new Date() } })
-    for (const to of statusSteps(res.status, o.status)) await moveStatus(tx, orderId, to)
-  })
   done()
   redirect(`${back}${back.includes("?") ? "&" : "?"}saved=1`)
+}
+
+// "Tout actualiser": every open parcel of the saved courier, now (the scheduled sync skips the ones checked
+// within the hour; this button doesn't). The toast says how many were checked and moved.
+export async function trackAll(back: string) {
+  await requireAdmin()
+  if (!back.startsWith("/admin/orders")) back = "/admin/orders"
+  const sep = back.includes("?") ? "&" : "?"
+  const s = await getSettings()
+  if (!courierReady(s)) redirect(`${back}${sep}error=courierSetup`)
+  const [r, { t }] = await Promise.all([syncAll(s, { pauseMs: 200 }), getI18n()])
+  done()
+  const summary = fill(t.admin.trackedAll, { checked: r.checked, moved: r.moved })
+  if (r.failed) redirect(`${back}${sep}error=courierTrack&detail=${encodeURIComponent(`${summary} ${r.error ?? ""}`.slice(0, 300))}`)
+  redirect(`${back}${sep}saved=1&detail=${encodeURIComponent(summary)}`)
 }
 
 // Any status, final ones too (e.g. why a parcel came back). Same `back` rule as the status.

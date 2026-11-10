@@ -12,7 +12,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test lib/*.test.ts",
     "admin:set": "tsx scripts/admin.mts",
-    "db:backup": "tsx scripts/backup.mts"
+    "db:backup": "tsx scripts/backup.mts",
+    "track:sync": "tsx scripts/track.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

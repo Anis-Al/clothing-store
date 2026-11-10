@@ -75,7 +75,11 @@ export async function Notice({ t, sp }: { t: Dict; sp: Promise<Record<string, st
       {msg}{typeof detail === "string" && detail && <span className="mt-1 block font-normal text-ink" dir="auto">{detail}</span>}
     </p>
   )
-  if (saved) return <p role="status" className={`${toast} toast-auto text-success`}>{t.admin.saved}</p>
+  if (saved) return (
+    <p role="status" className={`${toast} toast-auto text-success`}>
+      {t.admin.saved}{typeof detail === "string" && detail && <span className="mt-1 block font-normal text-ink" dir="auto">{detail}</span>}
+    </p>
+  )
   return null
 }
 
