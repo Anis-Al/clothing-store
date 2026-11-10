@@ -103,7 +103,13 @@ export function SettingsNav({ t, active, debug }: { t: Dict; active: SettingsTab
     <>
       <h1 className="text-[32px] font-medium">
         {t.admin.settings}
-        {debug && <span className="ms-3 rounded-full bg-cloud px-3 py-1 font-mono text-sm text-mute align-middle">debug</span>}
+        {/* the badge leaves debug mode (proxy.ts clears the cookie); Réglages then disappears */}
+        {debug && (
+          <Link href="/admin?debug=0" title={t.admin.exitDebug}
+            className="ms-3 inline-flex items-center gap-1.5 rounded-full bg-cloud px-3 py-1 align-middle font-mono text-sm text-mute hover:bg-hairline-soft hover:text-ink">
+            debug <span aria-hidden>×</span><span className="sr-only">{t.admin.exitDebug}</span>
+          </Link>
+        )}
       </h1>
       <nav aria-label={t.admin.settings} className="flex flex-wrap gap-2 border-b border-hairline pb-6">
         {tabs.map(([k, label, href]) => (

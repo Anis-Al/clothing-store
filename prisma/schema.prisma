@@ -147,6 +147,9 @@ model Settings {
   shippingTextFr String @default("")
   shippingTextAr String @default("")
   whatsapp       String @default("") // digits, international format; "" hides the button
+  instagram      String @default("") // profile URLs (a typed handle is turned into one); "" hides the footer link
+  facebook       String @default("")
+  tiktok         String @default("")
   storeWilaya    String @default("") // Boutique tab: "16 - Alger" (lib/wilayas), shown to a customer picking up
   storeCommune   String @default("") // Boutique tab: Latin commune name of storeWilaya (lib/communes)
   storeAddress   String @default("") // Boutique tab: street, district, hours; shown to a customer picking up

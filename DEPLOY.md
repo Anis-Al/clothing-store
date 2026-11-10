@@ -5,6 +5,8 @@ How to run and test the store on your PC, then put it online, keep it running, b
 > **Status:** the production commands below (`migrate deploy` → seed → `next start`) were run and
 > tested locally. The `docker build` itself has **not** been run yet (Docker wasn't set up on the dev
 > machine). Expect to fix small issues on the first real build. Troubleshooting is at the end.
+>
+> **Google Cloud:** `DEPLOY-GCP.md` walks through creating the VM, then points back here.
 
 ---
 
@@ -216,7 +218,7 @@ Create `/srv/atelier.env` (outside the project folder, so updates never touch it
 SEED_DEMO=0         # real store: no demo products on the first start
 ```
 
-Store name, WhatsApp number, delivery fee and the rest are set later in the admin, `/admin/settings`.
+Store name, WhatsApp number, delivery fee and the rest are set later in the admin, Réglages: open `/admin?debug=1` once (Réglages only shows in debug mode), then `/admin/settings`.
 
 ### 3.4 Build and start
 
@@ -417,11 +419,11 @@ never delete that folder when updating. To update: `git pull && npm ci && npx pr
 
 | What | Where |
 |---|---|
-| Store name, tagline, home banner (title + image), WhatsApp number, delivery fee and delivery text, "Stock faible" threshold | Admin → **Réglages** (`/admin/settings`). No rebuild. Empty text fields use the built-in defaults. |
+| Store name, tagline, home banner (title + image), WhatsApp number, delivery fee and delivery text, "Stock faible" threshold | Admin → **Réglages** (`/admin/settings`, debug mode only: open `/admin?debug=1` first). No rebuild. Empty text fields use the built-in defaults. |
 | All other interface text (FR + AR) | `lib/dict.ts` (edit both `fr` and `ar`) |
 | Colours, radii | `app/globals.css` (`@theme` block) |
 | Fonts | `app/layout.tsx` |
-| Categories | Admin → **Réglages › Catégories** (`/admin/settings/categories`): main categories (shown in the navbar) and their sub-categories (shown on hover). Add, rename, move, delete when empty. Categories without products are hidden in the shop. The demo list for a fresh store is in `prisma/seed.ts`. |
+| Categories | Admin → **Réglages › Catégories** (`/admin/settings/categories`, debug mode): main categories (shown in the navbar, the ones that don't fit under "Plus"; in the phone menu) and their sub-categories. Add, rename, move, delete when empty. Categories without products are hidden in the shop. The demo list for a fresh store is in `prisma/seed.ts`. |
 | Demo products | Delete them in `/admin/products` once your real products are in. A product that already has orders can't be deleted; set its stock to 0 instead. |
 | Wilayas list | `lib/wilayas.ts` |
 

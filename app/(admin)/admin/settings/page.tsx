@@ -11,6 +11,8 @@ import { createStopDesk, deleteStopDesk, loadCourierDefaults, updateSettings, up
 import { parseKeys } from "@/lib/courier"
 import { COURIERS, courierOf } from "@/lib/couriers"
 import { db } from "@/lib/db"
+import { notFound } from "next/navigation"
+import { isDebug } from "@/lib/debug"
 import { DICTS, fill, getI18n, getSettings, type Dict } from "@/lib/i18n"
 import { DESK_PAGE, paginate } from "@/lib/utils"
 import { WILAYAS, wilayaValue } from "@/lib/wilayas"
@@ -29,7 +31,9 @@ export default async function Settings({ searchParams }: PageProps<"/admin/setti
   const tab = SETTINGS_TABS.find((k) => k === sp.tab) ?? "store"
   // ?debug=1 (Odoo-style developer mode): technical fields (courier, sandbox entry, relay point ids). Nav links and
   // the actions' redirects keep it. Gate a field with `debug && (...)`.
-  const debug = sp.debug === "1"
+  // Réglages exists only in debug mode (lib/debug.ts): outside it, a 404 like any unknown admin URL
+  const debug = await isDebug(sp)
+  if (!debug) notFound()
   const pageOf = (k: string) => Math.max(1, Math.floor(Number(sp[k])) || 1)
   const fees = paginate(WILAYAS.length, pageOf("fp"), FEE_PAGE)
   const [desks, tariffs] = tab === "delivery"
@@ -177,6 +181,14 @@ export default async function Settings({ searchParams }: PageProps<"/admin/setti
                       <Input name="heroImage" type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif" className="pt-2" />
                     </Field>
                   </div>
+                </div>
+                {/* social profiles, shown in the site's footer: a link or just the handle */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {(["instagram", "facebook", "tiktok"] as const).map((k, i) => (
+                    <Field key={k} label={t.admin[k]} hint={i === 0 ? t.admin.socialHint : undefined}>
+                      <Input name={k} dir="ltr" maxLength={200} defaultValue={s[k]} placeholder="@lerepere" />
+                    </Field>
+                  ))}
                 </div>
               </>
             )}

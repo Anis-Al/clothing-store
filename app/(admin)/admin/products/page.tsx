@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ListFilters, Pager } from "@/components/admin/fields"
 import { db } from "@/lib/db"
 import { formatPrice, getI18n, getSettings } from "@/lib/i18n"
-import { listHref, listParams, paginate } from "@/lib/utils"
+import { cn, listHref, listParams, paginate } from "@/lib/utils"
 
 const PATH = "/admin/products"
 const PER_PAGE = 5
@@ -40,7 +40,7 @@ export default async function AdminProducts({ searchParams }: PageProps<"/admin/
         </div>
       </div>
       <ListFilters t={t} path={PATH} cur={cur} categories={categories} placeholder={t.admin.searchProducts} />
-      <Table>
+      <Table stack>
         <TableHeader>
           <TableRow>
             <TableHead className="w-16" />
@@ -52,20 +52,30 @@ export default async function AdminProducts({ searchParams }: PageProps<"/admin/
           </TableRow>
         </TableHeader>
         <TableBody>
-          {products.map((p) => (
-            <TableRow key={p.id}>
-              <TableCell>
-                <div className="relative size-12 bg-cloud">
-                  {p.images[0] && <Image src={p.images[0].url} alt="" fill sizes="48px" className="object-cover" />}
-                </div>
-              </TableCell>
-              <TableCell><Link href={`/admin/products/${p.id}`} className="font-medium underline-offset-4 hover:underline">{p.name}</Link></TableCell>
-              <TableCell>{p.category.name}</TableCell>
-              <TableCell className="tabular-nums">{p.variants.length}</TableCell>
-              <TableCell className="tabular-nums">{p.variants.reduce((s, v) => s + v.stockCount, 0)}</TableCell>
-              <TableCell>{p.variants.length ? formatPrice(Math.min(...p.variants.map((v) => v.price)), locale) : "—"}</TableCell>
-            </TableRow>
-          ))}
+          {products.map((p) => {
+            const stock = p.variants.reduce((s, v) => s + v.stockCount, 0)
+            const price = p.variants.length ? formatPrice(Math.min(...p.variants.map((v) => v.price)), locale) : "—"
+            return (
+              <TableRow key={p.id} className="max-md:flex-nowrap max-md:gap-3 max-md:py-2">
+                <TableCell className="max-md:shrink-0 max-md:p-0">
+                  <div className="relative size-12 bg-cloud">
+                    {p.images[0] && <Image src={p.images[0].url} alt="" fill sizes="48px" className="object-cover" />}
+                  </div>
+                </TableCell>
+                <TableCell className="max-md:min-w-0 max-md:flex-1 max-md:p-0">
+                  <Link href={`/admin/products/${p.id}`} className="font-medium underline-offset-4 hover:underline">{p.name}</Link>
+                  {/* phones: the other columns as one muted line under the name (no header, no sideways scroll) */}
+                  <p className="mt-0.5 text-sm text-mute md:hidden">
+                    {p.category.name} · {t.admin.variants} {p.variants.length} · {t.admin.stock} <span className={cn(!stock && "text-sale")}>{stock}</span> · {price}
+                  </p>
+                </TableCell>
+                <TableCell className="max-md:hidden">{p.category.name}</TableCell>
+                <TableCell className="tabular-nums max-md:hidden">{p.variants.length}</TableCell>
+                <TableCell className="tabular-nums max-md:hidden">{stock}</TableCell>
+                <TableCell className="max-md:hidden">{price}</TableCell>
+              </TableRow>
+            )
+          })}
         </TableBody>
       </Table>
       {!products.length && <p className="text-mute">{t.admin.none}</p>}

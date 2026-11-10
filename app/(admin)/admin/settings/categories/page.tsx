@@ -6,6 +6,8 @@ import { ConfirmButton, NoteInput } from "@/components/admin/client"
 import { Help, Notice, SettingsNav } from "@/components/admin/fields"
 import { createCategory, deleteCategory, updateCategory } from "@/lib/actions/admin"
 import { db } from "@/lib/db"
+import { notFound } from "next/navigation"
+import { isDebug } from "@/lib/debug"
 import { fill, getI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -19,7 +21,9 @@ export default async function Categories({ searchParams }: PageProps<"/admin/set
     db.category.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { products: true, children: true } } } }),
     searchParams,
   ])
-  const debug = sp.debug === "1"
+  // Réglages exists only in debug mode (lib/debug.ts): outside it, a 404 like any unknown admin URL
+  const debug = await isDebug(sp)
+  if (!debug) notFound()
   const edit = sp.edit === "1"
   const href = (on: boolean) => {
     const q = new URLSearchParams()

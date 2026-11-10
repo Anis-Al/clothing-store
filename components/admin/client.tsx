@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { importProducts } from "@/lib/actions/admin"
 import { FormSelect } from "@/components/form-select"
-import { communesOf, WILAYAS, wilayaValue } from "@/lib/wilayas"
+import { communeLabel, communesOf, WILAYAS, wilayaValue } from "@/lib/wilayas"
 
 // Order note: Enter submits natively (single field, no button); leaving the field with a change submits too,
 // so a note typed and then clicked away from isn't lost.
@@ -127,7 +127,7 @@ export function PlaceFields({ names = ["wilaya", "commune"], wilaya = "", commun
         {t.cart.commune}
         {/* key: a new wilaya remounts it empty (the saved commune belongs to the saved wilaya only) */}
         <FormSelect key={w} name={names[1]} disabled={!communes.length} placeholder={t.cart.chooseCommune} defaultValue={w === wilaya ? commune : ""}
-          items={communes.map(([fr, ar]) => ({ value: fr, label: locale === "ar" ? ar : fr }))} />
+          items={communes.map(([fr, ar]) => ({ value: fr, label: locale === "ar" ? ar : communeLabel(fr) }))} />
       </label>
     </>
   )

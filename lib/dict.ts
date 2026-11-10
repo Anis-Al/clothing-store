@@ -3,7 +3,8 @@
 
 const fr = {
   store: { name: "ATELIER", tagline: "Vêtements pensés pour durer." },
-  nav: { shop: "Boutique", search: "Rechercher", cart: "Panier", logout: "Se déconnecter", admin: "Administration", help: "Aide" },
+  nav: { shop: "Boutique", search: "Rechercher", cart: "Panier", logout: "Se déconnecter", admin: "Administration", help: "Aide", menu: "Menu", more: "Plus" },
+  footer: { contact: "Contact", allWilayas: "Livraison dans les 58 wilayas", cod: "Paiement à la livraison", whatsapp: "WhatsApp" },
   home: {
     heroTitle: "Nouvelle saison", heroCta: "Découvrir", latest: "Nouveautés", categories: "Par catégorie",
     shopNow: "Voir", store: "Notre boutique", directions: "Itinéraire", map: "Carte : la boutique", whatsapp: "Nous écrire sur WhatsApp",
@@ -13,7 +14,7 @@ const fr = {
     color: "Couleur", empty: "Aucun produit ne correspond à votre recherche.", clear: "Effacer les filtres",
     searchFor: "Résultats pour", colors: "couleurs", soldOut: "Épuisé",
     sortBy: "Trier", sortNew: "Nouveautés", sortPriceAsc: "Prix croissant", sortPriceDesc: "Prix décroissant",
-    filters: "Filtres",
+    filters: "Filtres", remove: "Retirer", numberSizes: "Tailles en chiffres",
   },
   product: {
     selectColor: "Couleur", selectSize: "Choisir une taille", addToCart: "Ajouter au panier",
@@ -60,7 +61,7 @@ const fr = {
     tooMany: "Trop de commandes depuis cette connexion. Réessayez dans quelques minutes ou contactez-nous.",
   },
   admin: {
-    dashboard: "Tableau de bord", dashboardShort: "Accueil", account: "Compte", products: "Produits", inventory: "Stock", orders: "Commandes",
+    exitDebug: "Quitter le mode debug", dashboard: "Tableau de bord", dashboardShort: "Accueil", account: "Compte", products: "Produits", inventory: "Stock", orders: "Commandes",
     backToStore: "Voir la boutique", newProduct: "Nouveau produit", edit: "Modifier", delete: "Supprimer",
     save: "Enregistrer", name: "Nom",
     description: "Description", category: "Catégorie", variants: "Variantes", price: "Prix (DA)",
@@ -69,7 +70,7 @@ const fr = {
     matrixHint: "Une variante est créée pour chaque couleur × taille.", addVariants: "Ajouter les variantes",
     upload: "Téléverser", imageFor: "Pour la couleur", allColors: "Toutes les couleurs",
     sortStockAsc: "Stock ↑", sortStockDesc: "Stock ↓", product: "Produit", customer: "Client",
-    items: "Articles", date: "Date", total: "Total", status: "Statut", lowStock: "Stock faible",
+    items: "Articles", orderDetails: "Détails", date: "Date", total: "Total", status: "Statut", lowStock: "Stock faible",
     pending: "Commandes en attente", noImages: "Aucune image.", confirmDelete: "Supprimer définitivement ?",
     hasOrders: "Impossible : des commandes y font référence. Mettez le stock à 0.", saved: "Enregistré.",
     delivery: "Livraison", all: "Toutes", searchOrders: "Nom, téléphone ou n°",
@@ -122,6 +123,9 @@ const fr = {
     sStore: "Boutique", storeName: "Nom de la boutique", tagline: "Slogan",
     whatsapp: "Numéro WhatsApp",
     whatsappHint: "Format international, ex. 213555123456. Vide : pas de bouton WhatsApp sur les fiches produit.",
+    instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok",
+    socialHint: "Le lien du profil ou juste le nom (@lerepere). Affichés en pied de page ; vide : pas de lien.",
+    badSocial: "Lien de réseau social invalide : collez le lien du profil ou tapez le nom (@lerepere).",
     badWhatsapp: "Numéro WhatsApp invalide : 8 à 15 chiffres avec l'indicatif du pays (ex. 213555123456).",
     badCoords: "Coordonnées invalides : collez « latitude, longitude », par exemple 36.7538, 3.0588.",
     storeCoords: "Position GPS de la boutique", storeCoordsHint: "Dans Google Maps, clic droit (ou appui long) sur la boutique, puis cliquez sur les chiffres pour les copier. Vide = pas de carte sur la page d'accueil.",
@@ -166,7 +170,8 @@ export type Dict = typeof fr
 
 const ar: Dict = {
   store: { name: "ATELIER", tagline: "ملابس مصممة لتدوم." },
-  nav: { shop: "المتجر", search: "بحث", cart: "السلة", logout: "تسجيل الخروج", admin: "الإدارة", help: "مساعدة" },
+  nav: { shop: "المتجر", search: "بحث", cart: "السلة", logout: "تسجيل الخروج", admin: "الإدارة", help: "مساعدة", menu: "القائمة", more: "المزيد" },
+  footer: { contact: "اتصل بنا", allWilayas: "التوصيل إلى 58 ولاية", cod: "الدفع عند الاستلام", whatsapp: "واتساب" },
   home: {
     heroTitle: "موسم جديد", heroCta: "اكتشف", latest: "وصل حديثاً", categories: "حسب الفئة", shopNow: "تسوّق",
     store: "متجرنا", directions: "الاتجاهات", map: "خريطة: موقع المتجر", whatsapp: "راسلونا على واتساب",
@@ -176,7 +181,7 @@ const ar: Dict = {
     empty: "لا توجد منتجات مطابقة لبحثك.", clear: "مسح الفلاتر", searchFor: "نتائج البحث عن",
     colors: "ألوان", soldOut: "نفد",
     sortBy: "ترتيب", sortNew: "الأحدث", sortPriceAsc: "السعر تصاعدياً", sortPriceDesc: "السعر تنازلياً",
-    filters: "تصفية",
+    filters: "تصفية", remove: "إزالة", numberSizes: "المقاسات بالأرقام",
   },
   product: {
     selectColor: "اللون", selectSize: "اختر المقاس", addToCart: "أضف إلى السلة", soldOut: "نفد المخزون",
@@ -222,14 +227,14 @@ const ar: Dict = {
     tooMany: "طلبات كثيرة من هذا الاتصال. أعد المحاولة بعد دقائق أو تواصل معنا.",
   },
   admin: {
-    dashboard: "لوحة التحكم", dashboardShort: "الرئيسية", account: "الحساب", products: "المنتجات", inventory: "المخزون", orders: "الطلبات",
+    exitDebug: "الخروج من وضع debug", dashboard: "لوحة التحكم", dashboardShort: "الرئيسية", account: "الحساب", products: "المنتجات", inventory: "المخزون", orders: "الطلبات",
     backToStore: "عرض المتجر", newProduct: "منتج جديد", edit: "تعديل", delete: "حذف", save: "حفظ",
     name: "الاسم", description: "الوصف",
     category: "الفئة", variants: "المتغيرات", price: "السعر (دج)", stock: "المخزون", sku: "المرجع", color: "اللون",
     size: "المقاس", images: "الصور", colorsList: "الألوان (مفصولة بفواصل)", sizesList: "المقاسات (مفصولة بفواصل)",
     matrixHint: "يُنشأ متغيّر لكل لون × مقاس.", addVariants: "إضافة المتغيرات", upload: "رفع", imageFor: "للون",
     allColors: "كل الألوان", sortStockAsc: "المخزون ↑", sortStockDesc: "المخزون ↓", product: "المنتج",
-    customer: "الزبون", items: "المواد", date: "التاريخ", total: "المجموع", status: "الحالة",
+    customer: "الزبون", items: "المواد", orderDetails: "التفاصيل", date: "التاريخ", total: "المجموع", status: "الحالة",
     lowStock: "مخزون منخفض", pending: "طلبات قيد الانتظار", noImages: "لا توجد صور.",
     confirmDelete: "حذف نهائي؟", hasOrders: "غير ممكن: توجد طلبات مرتبطة. اجعل المخزون 0.", saved: "تم الحفظ.",
     delivery: "التوصيل", all: "الكل", searchOrders: "الاسم أو الهاتف أو الرقم",
@@ -287,6 +292,9 @@ const ar: Dict = {
     parcelOptions: "خيارات الطرود", parcelOpenable: "يمكن للزبون فتح الطرد قبل الدفع",
     parcelInsured: "تأمين الطرد (القيمة المصرّح بها = مجموع الطلب)", parcelWeight: "وزن الطرد (كغ)",
     parcelWeightHint: "يُرسل مع كل طرد. 0 = الوزن الافتراضي لشركة التوصيل.",
+    instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok",
+    socialHint: "رابط الحساب أو الاسم فقط (@lerepere). يظهر أسفل الصفحة؛ فارغ: لا رابط.",
+    badSocial: "رابط شبكة اجتماعية غير صالح: الصقوا رابط الحساب أو اكتبوا الاسم (@lerepere).",
     badWhatsapp: "رقم واتساب غير صالح: من 8 إلى 15 رقماً مع رمز الدولة (مثال: 213555123456).",
     sHome: "الصفحة الرئيسية", heroTitle: "عنوان اللافتة", heroImage: "صورة اللافتة",
     heroImageHint: "صورة أفقية بعرض 1600 بكسل أو أكثر. بدون صورة تبقى اللافتة سوداء.",

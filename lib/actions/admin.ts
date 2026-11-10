@@ -321,6 +321,18 @@ export async function deleteImage(productId: string, imageId: string) {
   redirect(`/admin/products/${productId}`)
 }
 
+// Social profile: the full link, or just the handle ("@lerepere", "lerepere") → base + handle. Only http(s) links
+// (a typed `javascript:` must never land in the footer). null = invalid, "" = none.
+function social(raw: string, base: string) {
+  const v = raw.trim().replace(/^@/, "")
+  if (!v) return ""
+  if (/^[\w.-]{1,60}$/.test(v)) return base + v
+  try {
+    const u = new URL(/^[a-z][a-z\d+.-]*:/i.test(v) ? v : `https://${v}`)
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href.slice(0, 200) : null
+  } catch { return null }
+}
+
 // Réglages. Empty text fields fall back to the built-in FR/AR defaults (lib/i18n getI18n).
 // Each tab (`tab`, only used for the redirect) posts its own fields: absent fields are left as they are.
 export async function updateSettings(tab: string, f: FormData) {
@@ -328,6 +340,9 @@ export async function updateSettings(tab: string, f: FormData) {
   const back = `/admin/settings?${tab === "store" ? "" : `tab=${encodeURIComponent(tab)}&`}${(await debugQ()).slice(1) && "debug=1&"}`
   const whatsapp = str(f, "whatsapp").replace(/\D/g, "")
   if (whatsapp && (whatsapp.length < 8 || whatsapp.length > 15)) redirect(`${back}error=badWhatsapp`)
+  const socials = { instagram: "https://www.instagram.com/", facebook: "https://www.facebook.com/", tiktok: "https://www.tiktok.com/@" }
+  const links = Object.fromEntries(Object.entries(socials).map(([k, base]) => [k, social(str(f, k), base)]))
+  if (Object.values(links).includes(null)) redirect(`${back}error=badSocial`)
   const fromWilaya = str(f, "courierFromWilaya")
   if (fromWilaya && !isWilaya(fromWilaya)) redirect(`${back}error=required`)
   const storeWilaya = str(f, "storeWilaya")
@@ -364,6 +379,7 @@ export async function updateSettings(tab: string, f: FormData) {
     heroTitleFr: str(f, "heroTitleFr").slice(0, 60), heroTitleAr: str(f, "heroTitleAr").slice(0, 60),
     shippingTextFr: str(f, "shippingTextFr").slice(0, 500), shippingTextAr: str(f, "shippingTextAr").slice(0, 500),
     heroImage, whatsapp, lowStock: int(f, "lowStock"),
+    instagram: links.instagram!, facebook: links.facebook!, tiktok: links.tiktok!,
     storeWilaya, storeCommune, storeAddress: str(f, "storeAddress").slice(0, 200),
     // checkbox: a hidden "" twin keeps the key in the FormData when unchecked, so `has` still sees it
     homeEnabled: on("homeEnabled"), pickupEnabled: on("pickupEnabled"), stopdeskEnabled: on("stopdeskEnabled"),

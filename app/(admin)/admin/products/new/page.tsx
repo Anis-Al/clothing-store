@@ -4,6 +4,7 @@ import { MatrixFields, Notice, ProductFields } from "@/components/admin/fields"
 import { createProduct } from "@/lib/actions/admin"
 import { db } from "@/lib/db"
 import { getI18n } from "@/lib/i18n"
+import { isDebug } from "@/lib/debug"
 
 export default async function NewProduct({ searchParams }: PageProps<"/admin/products/new">) {
   const [{ t }, categories] = await Promise.all([getI18n(), db.category.findMany({ orderBy: { name: "asc" } })])
@@ -13,7 +14,8 @@ export default async function NewProduct({ searchParams }: PageProps<"/admin/pro
       <div className="flex max-w-3xl flex-col items-start gap-6">
         <h1 className="text-[32px] font-medium">{t.admin.newProduct}</h1>
         <p>{t.admin.noCategory}</p>
-        <Link href="/admin/settings/categories" className={buttonVariants()}>{t.admin.categories}</Link>
+        {/* Catégories lives in Réglages, which only exists in debug mode */}
+        {(await isDebug()) && <Link href="/admin/settings/categories" className={buttonVariants()}>{t.admin.categories}</Link>}
       </div>
     )
   return (

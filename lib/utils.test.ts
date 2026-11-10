@@ -94,6 +94,11 @@ test("DZ phone + wilaya + commune validation", async () => {
   assert.ok(!isCommune("31 - Oran", first[0])) // commune of another wilaya
   assert.ok(!isCommune("16 - Alger", first[1])) // Arabic label is not the stored value
   assert.ok(!isCommune("16 - Alger", ""))
+  // display spelling ≠ stored value: "Douira" stays what the gateway gets, people read "Douera"
+  const { communeLabel } = await import("./wilayas")
+  assert.ok(isCommune("16 - Alger", "Douira"))
+  assert.equal(communeLabel("Douira"), "Douera")
+  assert.equal(communeLabel("Draria"), "Draria")
   assert.equal(normalizePhone("0555 12 34 56"), "0555123456")
   assert.equal(normalizePhone("+213 661-22-33-44"), "0661223344")
   assert.equal(normalizePhone("00213799887766"), "0799887766")

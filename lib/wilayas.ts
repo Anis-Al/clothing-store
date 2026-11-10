@@ -23,6 +23,10 @@ export const wilayaValue = ([code, fr]: (typeof WILAYAS)[number]) => `${code} - 
 export const isWilaya = (v: string) => WILAYAS.some((w) => wilayaValue(w) === v)
 // Communes of a stored wilaya value ("16 - Alger" → COMMUNES["16"]); orders store the commune's Latin name.
 export const communesOf = (wilaya = "") => COMMUNES[wilaya.slice(0, 2)] ?? []
+// French spelling shown to people when it differs from the stored value (dzship's name, which the courier gateway
+// expects: never rename the value itself)
+const COMMUNE_LABELS: Record<string, string> = { Douira: "Douera" }
+export const communeLabel = (latin: string) => COMMUNE_LABELS[latin] ?? latin
 export const isCommune = (wilaya: string, v: string) => isWilaya(wilaya) && communesOf(wilaya).some(([fr]) => fr === v)
 
 // Algerian mobile: 05/06/07 + 8 digits, also +213 / 00213 prefixes. Stored as 0XXXXXXXXX.
@@ -35,5 +39,5 @@ export function normalizePhone(raw: string) {
 export function storePlace(s: { storeAddress: string; storeWilaya: string; storeCommune: string }, locale: "fr" | "ar") {
   const w = WILAYAS.find((x) => wilayaValue(x) === s.storeWilaya)
   const c = communesOf(s.storeWilaya).find(([fr]) => fr === s.storeCommune)
-  return [s.storeAddress, c && (locale === "ar" ? c[1] : c[0]), w && (locale === "ar" ? w[2] : w[1])].filter(Boolean).join(locale === "ar" ? "، " : ", ")
+  return [s.storeAddress, c && (locale === "ar" ? c[1] : communeLabel(c[0])), w && (locale === "ar" ? w[2] : w[1])].filter(Boolean).join(locale === "ar" ? "، " : ", ")
 }

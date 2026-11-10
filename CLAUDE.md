@@ -14,7 +14,7 @@ Append new entries to the **Journal** just above `Known gaps / next steps` (keep
 
 | Piece | Version | Note |
 |---|---|---|
-| Next.js | 16.4.0 (App Router, Turbopack) | `proxy.ts` replaces `middleware.ts` (Next 16). |
+| Next.js | 16.4.6 (App Router, Turbopack) | `proxy.ts` replaces `middleware.ts` (Next 16). 16.4.0–16.4.5 have critical advisories. |
 | React | 19.3 | |
 | Prisma + SQLite | 6.19.3 | Pinned to 6: Prisma 7+/8 needs driver adapters (native `better-sqlite3`) — 6 ships the SQLite engine, simpler on Alpine. |
 | Auth.js (next-auth) | 5.0.0-beta.32 | Credentials provider only, JWT sessions. |
@@ -38,7 +38,8 @@ npm run admin:set -- USER PASSWORD   # create an admin or change a password
 npm run db:backup                    # VACUUM INTO prisma/backups/
 ```
 
-Deployment (Docker, HTTPS, backups, updates) and the full local test run are in `DEPLOY.md`.
+Deployment (Docker, HTTPS, backups, updates) and the full local test run are in `DEPLOY.md`; Google Cloud VM
+setup (demo / staging) in `DEPLOY-GCP.md`.
 The desktop app's preview pane starts dev from `.claude/launch.json` (config `dev`, port 3000); only one
 dev server can hold :3000, so check for the user's own `npm run dev` window first.
 
@@ -60,7 +61,7 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   `SHIPPED → RETURNED` (parcel refused / not collected, set once it is back in the shop), or `CANCELLED`.
   The enum's declaration order is the admin's display order (`Object.values(OrderStatus)`).
   `DELIVERED`, `RETURNED` and `CANCELLED` are **final** (`FINAL_STATUSES` in `lib/utils.ts`): `updateOrderStatus`
-  only writes to an open order (`RETURNED` only to a `SHIPPED` one), the orders page shows a badge on final orders,
+  only writes to an open order (`RETURNED` only to a `SHIPPED` one), the order card shows no buttons on final orders (its status chip says it),
   and every button leading to a final status asks first (`ConfirmButton`, `t.admin.confirmFinal`).
   Status changes are **next-step buttons** (`stepsOf()` in the orders page): one main button for the usual next step
   (Confirmer → Expédier / Marquer prête → Marquer livrée / retirée), the rest in a "⋯" menu (`MoreMenu`, native
@@ -78,9 +79,11 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   Every tab, pager link and every `back` passed to the status / note / courier actions comes from `href(patch)` in the
   page; the GET forms carry the rest with `keep(...)`. A new param goes into `cur` there, or saves and tab switches drop it.
   Layout: one card per order (status · ref · date, then customer + call / WhatsApp + note · delivery + courier ·
-  items · total with its fee + next-step buttons); the status (dot in `TONE`, one colour per status) leads the top line.
+  items · total with its fee + next-step buttons); the status leads the top line as one solid chip in its colour with its own icon (`StatusChip`: `CHIP` + `STATUS_ICON`;
+  tabs keep the bare `TONE` dot), then on desktop a 4-segment `Progress` bar (PENDING → CONFIRMED → SHIPPED → DELIVERED;
+  returned = ink then red, cancelled = empty). Shown once per card.
   The delivery method is `MethodMark` (ink disc + icon: truck / store / pin): it heads the delivery column with its
-  label on every card, and sits before the name in the phone summary (label `sr-only` there).
+  label on every card (not in the collapsed phone summary: status, date, total, name only).
 - **Images**: every upload goes through `saveUpload()` (`lib/actions/admin.ts`: jpg/png/webp/avif/gif,
   ≤ 8 MB, no SVG) into `public/uploads/` (created at boot by `instrumentation.ts`), URL
   `/uploads/<Date.now()>-<name>`, kept in `Image` (products) or `Settings.heroImage`. Deleting the row
@@ -101,7 +104,9 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   (`?edit=1`): names become inline fields (`NoteInput`: Enter or blur saves), empty ones get a trash icon, each card an
   "Ajouter une sous-catégorie…" field, and a field on top adds a main category. Rows rename only; the parent is the card.
   The actions still append `?open=<main id>` (unused since the folds went).
-  Navbar = main categories, sub-categories in a CSS hover/focus menu.
+  Navbar (from `lg`) = "Tout" + main categories, sub-categories in a CSS hover/focus menu; how many fit is set per
+  breakpoint (`SHOWN` in `components/store/header.tsx`: 2 from lg, 4 from xl, 6 from 2xl), the rest under "Plus".
+  Below `lg`: a menu button (`MenuDrawer`, native `<details>`) opens every category, mains folding open their subs.
   `?category=<slug>` on a main category includes its sub-categories (storefront `inCategory`, admin
   `OR: [{ id }, { parentId }]`). The shop lists only categories with products (`SHOWN_CATEGORY`).
   Slugs follow the product rule (from the name, never changed). Delete only when no products and no
@@ -120,7 +125,8 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   UI language for the cart's pickup line and the home page), opening hours (`storeHoursFr` / `storeHoursAr`, a FR/AR
   `pair()`, shown under the address on the home page and on the pickup line; the other language when one is empty), GPS position (`storeLat` / `storeLng`, pasted as one
   "36.7538, 3.0588" field; null = no map), low-stock threshold (debug) (Boutique); FR/AR hero title,
-  hero image (Page d'accueil); Livraison = full width, three columns from `xl` (form 16rem, the two lists share the rest; two
+  hero image, Instagram / Facebook / TikTok (`social()` in `lib/actions/admin.ts`: a link or a handle,
+  stored as an http(s) URL, anything else `?error=badSocial`; footer links) (Page d'accueil); Livraison = full width, three columns from `xl` (form 16rem, the two lists share the rest; two
   from `lg`, the third wraps under the first; phones stack): the save form (pickup / stop-desk switches; **in debug** also the FR/AR delivery text, the courier
   picker, its credentials, origin wilaya and the "Charger la grille…" button), the per-wilaya tariff (`?fp=`, 10 rows per
   page, `updateWilayaFees` writes only the rows posted) and the relay points (`StopDesk`, add form + list, `?dp=`,
@@ -129,7 +135,12 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   d'accueil · Livraison are `?tab=` on the same page, one short form each; `updateSettings(tab, f)` writes only the
   fields the form posted (`f.has`), so a new setting goes in exactly one tab, and a checkbox needs a hidden `""` twin +
   `f.getAll(k).includes("on")`.
-- **Debug mode** (Odoo-style): `?debug=1` on Réglages shows technical fields: the whole courier block (picker incl.
+- **Debug mode** (Odoo-style, `lib/debug.ts`): `?debug=1` on any admin URL turns it on, `?debug=0` (or the "debug ×"
+  badge on the Réglages title) turns it off; `proxy.ts` keeps it in an httpOnly `debug` cookie (path `/admin`) with one
+  redirect to the same URL. **Réglages exists only in debug mode**: its menu entry is hidden and `/admin/settings*` is a
+  404 outside it (`isDebug(sp)` + `notFound()`); the empty-catalog link to Catégories also needs it. Not a security
+  boundary (any admin can type `?debug=1`): it hides the technical setup from the shop's everyday admin. Inside, the
+  `debug && (...)` gates below still exist (harmless now that the page needs debug). In debug Réglages shows technical fields: the whole courier block (picker incl.
   the "Sandbox" entry, credentials, origin wilaya, Yalidine defaults button), the relay point `deskId` field and the
   `#id` tags, the FR/AR "Livraison et retours" text, the "Stock faible" threshold (Boutique). `SettingsNav debug` keeps it on every tab link; the settings actions keep it across saves by reading the
   `referer` (`debugQ()` in `lib/actions/admin.ts`), so no hidden input is needed. Gate a field with `debug && (...)`.
@@ -140,7 +151,8 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   (help icon); the FR/AR `pair()` fields carry `settingsHint` ("empty = default") on their first field.
 - **Wilaya + commune**: `lib/wilayas.ts` (58 wilayas, value `"16 - Alger"`) and `lib/communes.ts` (1541 communes,
   generated from dzship's `GET /v1/communes`, keyed by wilaya **code**, `[latin, arabic]`; the Latin name is exactly what
-  the courier gateway expects). Orders store the commune's Latin name; labels
+  the courier gateway expects). A French spelling people should read differently goes in `COMMUNE_LABELS`
+  (`communeLabel()`, `lib/wilayas.ts`: "Douira" shown "Douera"); every FR commune label goes through it, the value never changes. Orders store the commune's Latin name; labels
   follow the UI language. `checkout` refuses a commune outside the posted wilaya (`isCommune`). Never rename stored
   wilaya values: map spellings to a courier's list (Yalidine) at export / API time.
 - **Delivery fee**: per destination wilaya and method, model `WilayaFee { wilaya, home, desk }` (one row per wilaya,
@@ -1253,6 +1265,131 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   fixed in the local DB by `deskId`. Re-check: 200 / 200 communes exact for their wilaya. A store that already loaded the
   old rows keeps them (the button only adds missing `deskId`s): delete and reload the points there if needed.
 
+### 2026-11-10 — Production build, Next.js 16.4.0 → 16.4.6
+- User: "run a build". `npm run build` compiled and type-checked, then stopped once on a Next.js security notice; npm's
+  audit confirmed three critical advisories on `next` 16.0.0–16.4.0 (RCE in the image optimizer with SVG, Server Actions
+  DoS, RCE in `use cache` typed arrays; GHSA-2464-fhr4-w9xw, -p3m5-59mp-jv5r, -673q-mjm6-r5xr). The second build run
+  passed. User: upgrade. `next` + `eslint-config-next` 16.4.6, exact pins (patch release, React 19.3 within its peer range).
+- After the upgrade: typecheck, lint, 16 tests, build (first try), `next start` on :3600 → home, catalog, PDP, cart,
+  robots, login 200, `/admin` 307, unknown 404. `npm audit --omit=dev` lists nothing on `next` any more; the rest (express,
+  body-parser, qs, undici, fast-uri, minimatch) all come through the `shadcn` CLI package, which the app only uses for
+  `@import "shadcn/tailwind.css"` at build time; its CLI never runs in production. Left as is.
+- Docker image still not built: Docker isn't installed on this PC.
+
+### 2026-11-10 — Réglages only in debug mode, smaller category tiles
+- User: "make the whole settings page only visible on debug mode". Debug went from a Réglages-only URL param to a
+  cookie (see the convention). Verified: `?debug=0` → menu without Réglages (4 tabs on phones, grid columns follow the
+  count), `/admin/settings` → 404 "Page introuvable"; `?debug=1` → Réglages back, tab links carry `debug=1`, badge links
+  to `/admin?debug=0`, Catégories renders, a Boutique save → `?saved=1` on the same page.
+- User: home category tiles too big (phones, a bit on desktop). Two per row at every width (was one full-width 4:5 tile
+  on phones, ~430px tall each), square on phones; from lg four per row when there are more than two, otherwise two wide
+  2:1 tiles. Then (user: "uncropped on pc") from `md` the photo is `object-contain` with padding on the soft-cloud tile;
+  phones keep `cover`. Measured: phone 168 × 168 (section ~870 → 224px), 1440px 660 × 330 (was ~660 × 495), whole
+  garment visible. The Google map also rendered in the preview pane this time (pin at Douira).
+
+- Then (user: "fill more demo data… to see how the navbar would look"): 15 demo products by a one-off script (local DB
+  only, backup `prisma/backups/store-2026-11-10-12-10.db` first), one per empty sub-category (T-shirt, polo, pull, hoodie,
+  jean, short, veste, manteau, costume, survêtement, qamis, pyjama, boxers, baskets, casquette) with new SVG silhouettes,
+  same variant / stock pattern as the seed. 18 products, 157 variants; every main category now shows. Navbar measured:
+  1440px fits exactly (956 / 956), **1280px overflows by ~56–62px** in FR and AR ("Vestes & manteaux" runs into the
+  search pill), phones scroll the row (751px in 375, by design). Order is alphabetical (no manual order yet).
+
+### 2026-11-10 — Catalog filter layout
+- User: "improve the shop filters layout, no ai slop". Measured first at 1440 with the 18 demo products: a 3000px filter
+  column (34 size pills mixing S–XL, waists, suit and shoe sizes; 18 colour pills with names), the title wrapping in the
+  220px column, no summary of what's applied. Kept the existing Nike vocabulary (hairlines, ink, soft-cloud, no new
+  colour or effect):
+  - title + count and the sort on one row across the page; below it, a row of applied filters as soft-cloud chips with
+    × (each removes only itself, `q` included) + "Effacer les filtres" when there are two or more;
+  - filter column sticky under the 100px header (`md:sticky md:top-[116px]`, own thin scroll when taller than the screen);
+  - each group a native `<details open>` with the picked value muted next to its name ("Taille M") and a chevron;
+  - sizes as a tight 4-column grid, letter sizes first then "Tailles en chiffres"; colours as 28px swatches (name in
+    `title` / `aria-label` and in the group heading once picked, ring-2 ink when selected);
+  - phones: the "Filtres (n)" pill fold as before, the sort row under it.
+- Verified: column 3000 → 842px and pinned at 116px after scrolling 1200px; `?category=hauts&size=M&color=Noir` → three
+  chips linking to the URL without each filter, headings "Catégorie Hauts / Taille M / Couleur Noir"; 375px: chips, pill,
+  sort, products on the first screen, no sideways scroll; Arabic RTL, no overflow.
+
+### 2026-11-10 — Storefront menu on phones, capped navbar, catalog filter fixes
+- User: the phone category row scrolled sideways without showing it could. Now a menu button (`MenuDrawer`,
+  `components/store/menu-drawer.tsx`) before the store name opens a panel under the sticky header listing "Tout" and
+  every main category; a main one with sub-categories folds open in place (its "Tout" + subs). Closes on a link tap,
+  outside tap, Escape. Used below `lg` (tablets too, where hover menus never worked). Header on phones 132 → 100px;
+  the search field takes the row's free width (placeholder no longer cut), store name one line (`text-2xl` on phones).
+- Desktop navbar capped by breakpoint (2 / 4 / 6 main categories from lg / xl / 2xl, rest under a "Plus" hover menu
+  with their subs, Plus hidden when nothing is left over; gaps 16px below xl). Measured with the 6 demo groups, FR + AR:
+  no overflow at 1024 / 1280 / 1440 / 1536, no page scroll at 375.
+- Catalog filter column (user): a main category's chevron only unfolds its sub-categories (`<details>` per group, the
+  name stays the filter link, open on the picked group); the group headings no longer repeat the picked value ("Catégorie
+  Jeans"), which the title, the applied chip and the highlighted row already show.
+- Verified (preview pane): phone menu open → Hauts unfolded → Chemises → `?category=chemises`, panel closed; catalog
+  chevron on Bas → opened, URL unchanged; name → `?category=bas`. typecheck, lint clean.
+- Then (user: "slightly animated"): the panel fades + slides down on open (tw-animate `animate-in`, 200ms), the X spins in,
+  a sub-category fold slides in; closing sets `data-closing` for a 150ms slide-up before `open = false` (a `<details>`
+  hides its content at once). All `motion-safe:`. Checked by the computed `animationName` (enter / exit) at each step.
+- `DEPLOY-GCP.md` (user: "simple guide to deploy to gcp"): Compute Engine VM (`e2-small`, Paris / Madrid, Ubuntu 24.04,
+  HTTP/HTTPS tags), static IP, DNS or `sslip.io`, SSH, then `DEPLOY.md` §3.1–3.6; optional copy of the local DB + photos
+  into the volumes; snapshots, cost, budget alert. Says GCP is for demo / staging (loi 18-05). Not run: no GCP project
+  here. `DEPLOY.md`'s Réglages mentions now say debug mode (`/admin?debug=1`).
+
+### 2026-11-10 — Storefront footer
+- User: "the footer is kinda dull". Now an ink block (`components/store/footer.tsx`), everything from Réglages and
+  hidden when empty: a facts strip (Livraison dans les 58 wilayas when home delivery is on, Paiement à la livraison,
+  Retrait en boutique / Point relais when switched on, same rule as the cart), the store name in Bebas + tagline, Boutique
+  = Tout + the main categories, Contact = WhatsApp, shop place, hours, Itinéraire (coordinates), social links, Aide = the
+  delivery text. Phones: Boutique | Contact side by side (871 → 733px). The Panier link and the "© year" row were removed
+  (user); the language switch stays in the header only.
+- Social links (user, "yes"): migration `social_links` = `Settings.instagram` / `facebook` / `tiktok` (Réglages ›
+  Boutique, one row of three fields, help icon on the first). `@lerepere` → `https://www.instagram.com/lerepere`,
+  `facebook.com/lerepere.dz` → `https://facebook.com/lerepere.dz`, `javascript:…` → `?error=badSocial` toast.
+- Verified (dev, DOM-driven; screenshots timed out, the pane wasn't drawing): those three saves; footer text and
+  links at 375 / 768 / 1280 in FR and AR, no page overflow. Test links cleared afterwards. DB backed up first
+  (`prisma/backups/store-2026-11-10-13-13.db`). typecheck, lint, 16 tests clean.
+
+- Then: the three social fields moved to the Page d'accueil tab (user). Douira → **Douera** (user): display only,
+  `COMMUNE_LABELS` in `lib/wilayas.ts`, used by the cart and admin commune selects, `storePlace()` (cart pickup line,
+  home, footer) and the order cards; "Douira" stays the stored value (dzship's name, sent to the courier). Unit-tested.
+  Verified: Boutique tab without the social fields, Page d'accueil saves `@lerepere`, commune select and home page read
+  "Douera", no "Douira" left on the page. Test link cleared.
+
+### 2026-11-10 — Admin Stock and Produits on phones
+- Stock (user: "4 elements per page on mobile"): `PER_PAGE_PHONE = 4` when the request looks like a phone
+  (`Sec-CH-UA-Mobile: ?1`, or `Mobi` in the user agent), else 7. Server-side, so the pager counts match the device
+  (375px emulated Android: 4 rows, 1 / 40; desktop: 7 rows, 1 / 23).
+- Produits list (user: columns cut, sideways scroll): `Table stack`; on phones a row = photo + name + one muted line
+  "category · Variantes n · Stock n (red at 0) · lowest price", the other cells hidden. 375px: rows 79px, no overflow;
+  desktop keeps the header and six columns.
+
+- Order cards tightened (user: "lots of useless margins"): 12px padding at every width, top line `mb-2`, method
+  header = small disc + text-sm (was a 32px disc + 16px text + margin), courier + parcel number + last status + refresh
+  on one wrapping line (was two), note field 28px everywhere, from `md` the total + buttons sit beside the items (the
+  items used to share a row with an empty cell, and the total had its own ruled row below `xl`). Measured: 1440px
+  210 / 230 / 170 → 174 / 194 / 148px, 1024px 318 / 338 / 274 → 278 / 298 / 236px; phones unchanged (98px closed).
+
+- Status chip (user: "the current status part doesn't look so good"): the card said its status twice (a small dot +
+  label on top, and an outline badge under the total on final orders). Now one tinted chip on top (amber En attente,
+  blue Confirmée, grey Expédiée, green Livrée, red Retournée, muted Annulée), also in the phone summary; the badge is
+  gone, final cards just end on the total. Seen in screenshots at 800px and 375px; phones' closed card 98 → 102px.
+
+- Column captions (user: "Détails" and "Articles"; picked "headings on columns"): small muted `caption` over the delivery
+  column (`t.admin.orderDetails`, "Détails" / "التفاصيل") and over the items (`t.admin.items`, "Articles", as an
+  `aria-hidden` first `<li>`, the list keeps it as `aria-label`). Seen at 1024, 1440 and 375 (opened card), no overflow.
+
+- Collapsed phone card: the method icon before the name removed (user); the name lines up under the status chip.
+
+- Pointer cursor (user: Voir la boutique / العربية / Se déconnecter): `cursor-pointer` on the sidebar's `item`, and a base
+  rule in `app/globals.css` (enabled `button`, `[role=button]`, `summary`), since Tailwind v4 dropped the pointer on
+  buttons: every status button, menu and fold now shows it. Dev restarted for the CSS (Turbopack gotcha).
+
+- Signed-in username (user: "move admin to the top"): under the store name in the desktop sidebar, first line of the
+  phone ⋯ menu; no longer under Se déconnecter.
+
+- Status made "really clear" (user): solid chips with white text and an icon (Clock En attente amber, Check Confirmée
+  blue, Package Expédiée ink, CircleCheck Livrée green, Undo2 Retournée red, X Annulée grey on hairline), h-7 semibold, in
+  the card and the phone summary; desktop adds the 4-step progress bar next to it. Screenshots at 1280 (every status)
+  and 375; phone closed card 102 → 106px, no overflow. A 500 seen while editing came from the half-applied import
+  (`Clock is not defined`), gone after the second edit.
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - **SEO, still missing** (simplest first): `metadataBase` from a new `SITE_URL` env var (needed by the rest);
@@ -1275,9 +1412,10 @@ Keep this section last; update it when something here gets done or newly found.
   `TZ=Africa/Algiers`, untested). No "delivered on" date exists, so there is no revenue-over-time chart (only order value by
   order date).
 - Guest checkout limit is per IP, in memory: fake COD orders from many IPs still hold stock until cancelled.
-- Categories: no manual order (alphabetical), no category images (home tiles use the latest product's).
-  On touch tablets (≥768px) the hover menu doesn't open: tapping a main category opens its page, whose
-  sub-row lists the sub-categories.
+- Categories: no manual order (alphabetical), no category images (home tiles use the latest product's). With all six
+  navbar counts per breakpoint are fixed for today's name lengths: much longer main-category names can overflow
+  again (lower the counts in `SHOWN`). On touch screens ≥1024px the hover menus don't open: a tap opens the main
+  category's page (its sub-categories are in the catalog's filter column).
 - Delivery fee is per wilaya and method only (no per-commune, weight or free-shipping threshold); the tariff table is
   edited by hand (no CSV import / export). Built-in tariff + agencies exist for Yalidine only (`data/yalidine-*.csv`,
   a static copy from 2026-11: re-paste when Yalidine changes its grid); other couriers type theirs, or later pull them
@@ -1297,8 +1435,7 @@ Keep this section last; update it when something here gets done or newly found.
   `/admin/categories` URL is a 404.
 - WhatsApp button only on product pages (admin orders have a per-customer WhatsApp link).
 - Admin on phones: Stock's sort toggle lives in the (hidden) table header, so phones get the default order only
-  (lowest stock first; a sort select like Commandes' would fix it); inventory saves one row per click and reload. Produits list still
-  scrolls sideways a little (487px, read-only).
+  (lowest stock first; a sort select like Commandes' would fix it); inventory saves one row per click and reload.
 - A Livrée/Retournée/Annulée set by mistake can only be undone in the DB (`npx prisma studio`; on a return or
   cancel, take the stock back by hand too). A stale tab picking a status on an order finalized elsewhere (or
   Retournée on an order no longer shipped) gets no message.
@@ -1314,6 +1451,5 @@ Keep this section last; update it when something here gets done or newly found.
   a single-image product still shows a 1-thumbnail rail; add-to-cart toast timer isn't reset on a second
   add. Cart qty buttons are labelled "-"/"+".
 - From the 2026-10-14 UX review, not done: phones — PDP add-to-cart below the fold (967px on an 812px
-  screen; a sticky price + button bar would fix it), sticky header takes 132px (16%), header search
-  placeholder cut to "Recherc"; product cards show the lowest variant price with no "Dès" when prices
-  differ; `/merci` and the footer offer no contact (WhatsApp with the order ref); no swipe on PDP images.
+  screen; a sticky price + button bar would fix it), product cards show the lowest variant price with no "Dès" when prices
+  differ; `/merci` offers no contact (WhatsApp with the order ref); no swipe on PDP images.

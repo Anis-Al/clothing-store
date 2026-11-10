@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { headers } from "next/headers"
 import type { Prisma } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,9 +12,14 @@ import { cn, listHref, listParams, paginate } from "@/lib/utils"
 
 const PATH = "/admin/inventory"
 const PER_PAGE = 7
+// ponytail: phones told apart by the browser's own hint (Sec-CH-UA-Mobile, Chromium) or "Mobi" in the user agent
+// (Safari, Firefox; the usual MDN rule). A wrong guess only changes the page size.
+const PER_PAGE_PHONE = 4
 
 export default async function Inventory({ searchParams }: PageProps<"/admin/inventory">) {
   const cur = listParams(await searchParams)
+  const h = await headers()
+  const phone = h.get("sec-ch-ua-mobile") === "?1" || /Mobi/i.test(h.get("user-agent") ?? "")
   const sort = cur.sort || "asc"
   const { lowStock } = await getSettings()
   // q matches the product name or the reference (SKU)
@@ -28,7 +34,7 @@ export default async function Inventory({ searchParams }: PageProps<"/admin/inve
     db.productVariant.count({ where }),
     db.category.findMany({ orderBy: { name: "asc" } }),
   ])
-  const { page, pages, skip, take } = paginate(total, cur.page, PER_PAGE)
+  const { page, pages, skip, take } = paginate(total, cur.page, phone ? PER_PAGE_PHONE : PER_PAGE)
   const variants = await db.productVariant.findMany({
     where, skip, take, orderBy: [{ stockCount: sort }, { sku: "asc" }], include: { product: true },
   })

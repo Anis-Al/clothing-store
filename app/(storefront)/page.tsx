@@ -59,17 +59,20 @@ export default async function Home() {
 
       <section className="flex flex-col gap-6">
         <h2 className="text-2xl font-medium md:text-[32px]">{t.home.categories}</h2>
-        {/* 1–2 categories: big tiles; more: a denser 2/4-column grid so the page doesn't run for screens */}
-        <div className={cn("grid gap-2", many ? "grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2")}>
+        {/* two tiles per row from phone width (a full-width 4:5 tile was ~430px tall on a phone); from lg, four per row
+            when there are more than two, otherwise two wide 2:1 tiles (~275px tall at 1440px instead of ~410) */}
+        <div className={cn("grid grid-cols-2 gap-2", many && "lg:grid-cols-4")}>
           {categories.map((c) => {
             const img = [c, ...c.children].flatMap((x) => x.products)[0]?.images[0]?.url
             return (
               <Link key={c.id} href={`/products?category=${c.slug}`}
-                className={cn("relative flex aspect-[4/5] items-end bg-cloud", many ? "p-3 md:p-4" : "p-6 sm:aspect-[4/3]")}>
-                {img && <Image src={img} alt="" fill sizes={many ? "(max-width: 1023px) 50vw, 25vw" : "(max-width: 640px) 100vw, 50vw"} className="object-cover" />}
+                className={cn("relative flex aspect-square items-end bg-cloud p-3 md:p-4", !many && "md:aspect-[2/1] md:p-6")}>
+                {/* phones: the square tile is filled (cover); from md the whole photo shows (contain) on the soft-cloud tile,
+                    since a portrait product photo in a wide tile lost most of itself to the crop */}
+                {img && <Image src={img} alt="" fill sizes={many ? "(max-width: 1023px) 50vw, 25vw" : "50vw"} className="object-cover md:object-contain md:p-4" />}
                 <span className={buttonVariants({
-                  variant: "outline", size: many ? "sm" : "default",
-                  className: cn("relative border-0", many && "h-auto min-h-10 py-2 text-start whitespace-normal"),
+                  variant: "outline", size: "sm",
+                  className: cn("relative h-auto min-h-10 border-0 py-2 text-start whitespace-normal", !many && "md:h-12 md:px-8 md:text-base"),
                 })}>{c.name}</span>
               </Link>
             )

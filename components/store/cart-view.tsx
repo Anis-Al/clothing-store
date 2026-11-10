@@ -12,7 +12,7 @@ import { checkout, type Shipping } from "@/lib/actions/checkout"
 import { useCart, useCartReady } from "@/lib/cart"
 import { formatPrice } from "@/lib/dict"
 import { cn } from "@/lib/utils"
-import { communesOf, WILAYAS, wilayaValue } from "@/lib/wilayas"
+import { communeLabel, communesOf, WILAYAS, wilayaValue } from "@/lib/wilayas"
 
 type Method = NonNullable<Shipping["method"]>
 export type Desk = { id: string; wilaya: string; name: string; address: string }
@@ -206,7 +206,7 @@ export function CartView({ fees, home, pickup, storeAddress, desks }: { fees: Re
                       ponytail: all 1541 communes ship with the cart (~52 KB raw); dynamic import() if that ever matters */}
                   <FormSelect key={w} name="commune" required disabled={!communes.length} placeholder={t.cart.chooseCommune}
                     defaultValue={w === shipping.wilaya ? shipping.commune : undefined}
-                    items={communes.map(([fr, ar]) => ({ value: fr, label: locale === "ar" ? ar : fr }))} />
+                    items={communes.map(([fr, ar]) => ({ value: fr, label: locale === "ar" ? ar : communeLabel(fr) }))} />
                 </label>
                 <label className="flex flex-col gap-2 text-sm font-medium lg:col-span-2">
                   {t.cart.address}

@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { DeliveryMethod, OrderStatus, type Prisma } from "@prisma/client"
-import { MapPin, Phone, RefreshCw, Search, Store, Truck, X } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { Check, CircleCheck, Clock, MapPin, Package, Phone, RefreshCw, Search, Store, Truck, Undo2, X } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ConfirmButton, MoreMenu, NoteInput, OrderCard } from "@/components/admin/client"
@@ -15,7 +14,7 @@ import { courierOf } from "@/lib/couriers"
 import { db } from "@/lib/db"
 import { fill, formatDate, formatPrice, getI18n, getSettings } from "@/lib/i18n"
 import { cn, FINAL_STATUSES, listParams, paginate } from "@/lib/utils"
-import { communesOf, WILAYAS, wilayaValue } from "@/lib/wilayas"
+import { communeLabel, communesOf, WILAYAS, wilayaValue } from "@/lib/wilayas"
 
 const STATUSES = Object.values(OrderStatus) // schema order: the COD flow
 const METHODS = Object.values(DeliveryMethod)
@@ -29,6 +28,32 @@ const TONE: Record<OrderStatus, string> = {
   PENDING: "bg-[#b45309]", CONFIRMED: "bg-info", SHIPPED: "bg-ink", DELIVERED: "bg-success", RETURNED: "bg-sale", CANCELLED: "bg-stone",
 }
 const Dot = ({ s }: { s: OrderStatus }) => <span aria-hidden className={cn("size-2 shrink-0 rounded-full", TONE[s])} />
+// the card's status, shown once and loud: a solid chip in the status' colour with its own icon, then (desktop) how far
+// the order got along PENDING → CONFIRMED → SHIPPED → DELIVERED (a returned one ends red, a cancelled one stays empty)
+const CHIP: Record<OrderStatus, string> = {
+  PENDING: "bg-[#b45309] text-canvas", CONFIRMED: "bg-info text-canvas", SHIPPED: "bg-ink text-canvas",
+  DELIVERED: "bg-success text-canvas", RETURNED: "bg-sale text-canvas", CANCELLED: "bg-hairline text-ink",
+}
+const STATUS_ICON = { PENDING: Clock, CONFIRMED: Check, SHIPPED: Package, DELIVERED: CircleCheck, RETURNED: Undo2, CANCELLED: X } as const
+const StatusChip = ({ s, label }: { s: OrderStatus; label: string }) => {
+  const Icon = STATUS_ICON[s]
+  return (
+    <span className={cn("inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full ps-2 pe-3 text-sm font-semibold whitespace-nowrap", CHIP[s])}>
+      <Icon className="size-4" aria-hidden />{label}
+    </span>
+  )
+}
+const FLOW = ["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED"] as const
+const Progress = ({ s }: { s: OrderStatus }) => {
+  const reached = s === "CANCELLED" ? -1 : s === "RETURNED" ? 3 : FLOW.indexOf(s as (typeof FLOW)[number])
+  return (
+    <span aria-hidden className="flex items-center gap-1">
+      {FLOW.map((step, i) => (
+        <span key={step} className={cn("h-1.5 w-6 rounded-full", i > reached ? "bg-hairline-soft" : s === "RETURNED" ? (i === 3 ? "bg-sale" : "bg-ink") : TONE[s])} />
+      ))}
+    </span>
+  )
+}
 const METHOD_ICON = { HOME: Truck, PICKUP: Store, STOPDESK: MapPin } as const
 
 // Commandes: one card per order (customer · delivery · items · total + status), status tabs on top, then the method
@@ -95,7 +120,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
     const w = WILAYAS.find((x) => wilayaValue(x) === wilaya)
     const wName = w ? (locale === "ar" ? w[2] : w[1]) : wilaya.replace(/^\d+ - /, "")
     const c = communesOf(wilaya).find(([fr]) => fr === commune)
-    const cName = c ? (locale === "ar" ? c[1] : c[0]) : commune
+    const cName = c ? (locale === "ar" ? c[1] : communeLabel(c[0])) : commune
     return [cName && cName !== wName && !(w && commune === w[1]) ? cName : "", wName].filter(Boolean).join(locale === "ar" ? "، " : ", ")
   }
   // a pickup order isn't shipped: Expédiée reads "Prête en boutique", Livrée "Retirée", Retournée "Non retirée"
@@ -119,6 +144,8 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
     }
     return { more: [] }
   }
+  // column caption on the card (Détails over the delivery column, Articles over the items)
+  const caption = "text-xs font-medium text-mute"
   const pill = "inline-flex h-8 items-center gap-1.5 rounded-full bg-cloud px-3 text-sm hover:bg-hairline-soft"
   // the delivery method as an ink disc with its icon (À domicile truck, Retrait store, Point relais pin)
   const MethodMark = ({ m, small }: { m: DeliveryMethod; small?: boolean }) => {
@@ -227,31 +254,32 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
           )
           return (
             <OrderCard key={o.id} label={`#${o.id.slice(-8).toUpperCase()} · ${o.fullName}`}
-              className={cn("rounded-2xl border border-hairline-soft px-4 py-3 hover:border-hairline md:py-4", o.status === "CANCELLED" && "bg-cloud/50")}
+              className={cn("rounded-2xl border border-hairline-soft px-4 py-3 hover:border-hairline", o.status === "CANCELLED" && "bg-cloud/50")}
               // phones, collapsed: status · date · total, then the name; the next step stays one tap away
               top={<>
-                <Dot s={o.status} /><span className="shrink-0 font-medium whitespace-nowrap">{statusLabel(o.status, o.method)}</span>
-                <span className="min-w-0 truncate text-mute">· {formatDate(o.createdAt, locale)}</span>
+                <StatusChip s={o.status} label={statusLabel(o.status, o.method)} />
+                <span className="min-w-0 truncate text-mute">{formatDate(o.createdAt, locale)}</span>
                 <span className="ms-auto shrink-0 tabular-nums text-mute">{formatPrice(o.totalAmount, locale)}</span>
               </>}
               bottom={<>
-                <MethodMark m={o.method} small /><span className="sr-only">{methodLabel[o.method]}</span>
                 <span className="min-w-0 truncate font-medium">{o.fullName || "—"}</span>
               </>}
               action={next && statusForm(false)}>
 
               {/* status first: the list scans by it (phones: already in the summary row) */}
-              <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm md:mb-3">
-                <span className="flex items-center gap-2 font-medium max-md:hidden"><Dot s={o.status} />{statusLabel(o.status, o.method)}</span>
+              <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                <span className="flex items-center gap-3 max-md:hidden">
+                  <StatusChip s={o.status} label={statusLabel(o.status, o.method)} /><Progress s={o.status} />
+                </span>
                 <span className="font-mono text-xs" dir="ltr">#{o.id.slice(-8).toUpperCase()}</span>
                 <span className="text-mute max-md:hidden">{formatDate(o.createdAt, locale)}</span>
               </div>
 
-              <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_12rem]">
+              <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-x-6 md:gap-y-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_12rem]">
                 {/* customer: call / WhatsApp right here, then the call's outcome as a note */}
-                <div className="flex min-w-0 flex-col gap-1 md:gap-2">
+                <div className="flex min-w-0 flex-col gap-1">
                   {/* phones: name and the call / WhatsApp pills on one row */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 md:flex-col md:items-start md:justify-start">
+                  <div className="flex flex-wrap items-center justify-between gap-2 md:flex-col md:items-start md:justify-start md:gap-1.5">
                   {/* phones: name, date and total are already in the summary row above */}
                   <p className="min-w-0 truncate font-medium max-md:hidden">{o.fullName || "—"}</p>
                   {o.phone && (
@@ -270,14 +298,15 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                   {/* reads as text; a dashed line on hover shows it's editable. Saves on Enter or when leaving the field changed */}
                   <form action={updateOrderNote.bind(null, o.id, href({ page }))}>
                     <NoteInput name="note" defaultValue={o.note} maxLength={500} placeholder={t.admin.notePlaceholder} aria-label={t.admin.note}
-                      className="h-7 w-full border-b border-dashed border-transparent bg-transparent text-sm outline-none placeholder:text-mute hover:border-hairline focus:border-solid focus:border-ink md:h-8" />
+                      className="h-7 w-full border-b border-dashed border-transparent bg-transparent text-sm outline-none placeholder:text-mute hover:border-hairline focus:border-solid focus:border-ink" />
                   </form>
                 </div>
 
                 {/* delivery: the method as the column's header, then where it goes and the courier parcel (or the button) */}
                 <div className="flex min-w-0 flex-col gap-1 text-sm">
-                  <p className="mb-1 flex items-center gap-2.5 text-base font-medium">
-                    <MethodMark m={o.method} />{methodLabel[o.method]}
+                  <p className={caption}>{t.admin.orderDetails}</p>
+                  <p className="flex items-center gap-2 font-medium">
+                    <MethodMark m={o.method} small />{methodLabel[o.method]}
                   </p>
                   {o.method !== "PICKUP" && (
                     <>
@@ -285,13 +314,12 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                       <p className="text-mute max-md:line-clamp-1">{o.address}</p>
                       {o.tracking ? (
                         <>
-                          <p className="mt-1 flex flex-wrap items-center gap-x-2">
+                          {/* courier + parcel number, then its last status at the courier (dzship /v1/track, refreshed by hand;
+                              "unknown" shows the courier's wording): one line that wraps */}
+                          <div className="flex flex-wrap items-center gap-x-2">
                             <span className="text-mute">{courierOf(o.courier)?.[1] ?? o.courier}</span>
                             <span className="font-mono text-xs" dir="ltr">{o.tracking}</span>
                             {o.labelUrl && <a href={o.labelUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">{t.admin.label}</a>}
-                          </p>
-                          {/* the parcel's last status at the courier (dzship /v1/track), refreshed by hand; "unknown" shows the courier's wording */}
-                          <div className="flex flex-wrap items-center gap-x-2">
                             {o.courierStatus && (
                               <span className="font-medium">
                                 {o.courierStatus === "unknown" && o.courierRaw ? o.courierRaw : (t.courierStatus[o.courierStatus] ?? o.courierStatus)}
@@ -301,7 +329,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                             {courier && !final && o.courier === settings.courier && (
                               <form action={trackOrder.bind(null, o.id, href({ page }))}>
                                 <button type="submit" aria-label={t.admin.refreshTracking} title={t.admin.refreshTracking}
-                                  className={cn("inline-flex h-7 items-center gap-1.5 rounded-full text-sm text-mute hover:bg-cloud hover:text-ink", o.courierStatus ? "px-2" : "-ms-2 px-2")}>
+                                  className={cn("inline-flex h-6 items-center gap-1.5 rounded-full text-sm text-mute hover:bg-cloud hover:text-ink", o.courierStatus ? "px-2" : "-ms-2 px-2")}>
                                   <RefreshCw className="size-3.5" />{!o.courierStatus && t.admin.refreshTracking}
                                 </button>
                               </form>
@@ -309,7 +337,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                           </div>
                         </>
                       ) : courier && !final && (
-                        <form action={sendToCourier.bind(null, o.id, href({ page }))} className="mt-1">
+                        <form action={sendToCourier.bind(null, o.id, href({ page }))}>
                           <ConfirmButton message={fill(t.admin.confirmCourier, { courier })}
                             // long courier names ("Sandbox (test courier)"): wrap instead of pushing the page wider
                             className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "h-auto min-h-9 max-w-full py-1.5 text-start whitespace-normal")}>
@@ -321,7 +349,8 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                   )}
                 </div>
 
-                <ul className="flex min-w-0 flex-col gap-1 text-sm">
+                <ul aria-label={t.admin.items} className="flex min-w-0 flex-col gap-1 text-sm">
+                  <li aria-hidden className={caption}>{t.admin.items}</li>
                   {o.items.map((i) => (
                     <li key={i.id} className="flex gap-2">
                       <span className="shrink-0 tabular-nums text-mute">{i.quantity} ×</span>
@@ -334,16 +363,13 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                 </ul>
 
                 {/* total (with the delivery fee in it) + status: final ones are a badge, open ones the next-step button + ⋯ */}
-                <div className="flex items-center justify-between gap-4 max-xl:border-t max-xl:border-hairline-soft max-xl:pt-2.5 md:max-xl:pt-3 md:col-span-2 xl:col-span-1 xl:flex-col xl:items-end xl:justify-start">
-                  <div className="xl:text-end">
+                <div className="flex items-center justify-between gap-4 max-md:border-t max-md:border-hairline-soft max-md:pt-2.5 md:flex-col md:items-end md:justify-start md:gap-2">
+                  <div className="md:text-end">
                     <p className="text-lg font-medium tabular-nums max-md:hidden">{formatPrice(o.totalAmount, locale)}</p>
                     {o.shippingFee > 0 && <p className="text-xs text-mute">{t.admin.delivery} {formatPrice(o.shippingFee, locale)}</p>}
                   </div>
-                  {final ? (
-                    <Badge variant="outline" className={cn("h-9 gap-2 px-4 text-sm", o.status === "CANCELLED" && "text-mute", o.status === "RETURNED" && "text-sale")}>
-                      <Dot s={o.status} />{statusLabel(o.status, o.method)}
-                    </Badge>
-                  ) : statusForm(true)}
+                  {/* final orders: nothing to do, the chip on top says where they ended */}
+                  {!final && statusForm(true)}
                 </div>
               </div>
             </OrderCard>
