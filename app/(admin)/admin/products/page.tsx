@@ -3,6 +3,7 @@ import Link from "next/link"
 import { headers } from "next/headers"
 import type { Prisma } from "@prisma/client"
 import { buttonVariants } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ListFilters, Pager } from "@/components/admin/fields"
 import { db } from "@/lib/db"
@@ -11,7 +12,7 @@ import { cn, listHref, listParams, paginate } from "@/lib/utils"
 
 const PATH = "/admin/products"
 const PER_PAGE = 7 // rows fit a 1280×800 screen with the filters
-const PER_PAGE_PHONE = 5 // compact rows (same phone sniff as Stock)
+const PER_PAGE_PHONE = 7 // compact rows (same phone sniff as Stock); user's call
 
 export default async function AdminProducts({ searchParams }: PageProps<"/admin/products">) {
   const cur = listParams(await searchParams)
@@ -67,11 +68,18 @@ export default async function AdminProducts({ searchParams }: PageProps<"/admin/
                   </div>
                 </TableCell>
                 <TableCell className="max-md:min-w-0 max-md:flex-1 max-md:p-0">
-                  <Link href={`/admin/products/${p.id}`} className="font-medium underline-offset-4 hover:underline">{p.name}</Link>
-                  {/* phones: the other columns as one muted line under the name (no header, no sideways scroll) */}
-                  <p className="mt-0.5 text-sm text-mute md:hidden">
-                    {p.category.name} · {t.admin.variants} {p.variants.length} · {t.admin.stock} <span className={cn(!stock && "text-sale")}>{stock}</span> · {price}
-                  </p>
+                  {/* phones: price at the end of the name line (a bare "1 900 DA" after the stock read as anything), then
+                      the labelled counts; a low stock is amber, 0 red (same colours as the Stock page) */}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <Link href={`/admin/products/${p.id}`} className="font-medium underline-offset-4 hover:underline">{p.name}</Link>
+                    <span className="shrink-0 tabular-nums md:hidden">{price}</span>
+                  </div>
+                  {/* three chips, not one dotted line (user: "category · variants : n · stock : n" read as noise) */}
+                  <div className="mt-1.5 flex flex-wrap gap-1.5 md:hidden">
+                    <Badge variant="secondary">{p.category.name}</Badge>
+                    <Badge variant="outline" className="text-mute">{p.variants.length === 1 ? t.admin.variantOne : t.admin.variantMany.replace("{n}", String(p.variants.length))}</Badge>
+                    <Badge variant="outline" className={cn("tabular-nums", stock === 0 ? "text-sale" : stock <= lowStock && "text-[#b45309]")}>{t.admin.stock} {stock}</Badge>
+                  </div>
                 </TableCell>
                 <TableCell className="max-md:hidden">{p.category.name}</TableCell>
                 <TableCell className="tabular-nums max-md:hidden">{p.variants.length}</TableCell>

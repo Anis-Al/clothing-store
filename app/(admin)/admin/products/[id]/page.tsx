@@ -1,11 +1,11 @@
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { Plus, Trash2, X } from "lucide-react"
+import { Trash2, X } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ConfirmButton } from "@/components/admin/client"
+import { ConfirmButton, Modal } from "@/components/admin/client"
 import { Field, MatrixFields, Notice, ProductFields } from "@/components/admin/fields"
 import { FormSelect } from "@/components/form-select"
 import { addVariants, deleteImage, deleteProduct, deleteVariant, updateProduct, uploadImages } from "@/lib/actions/admin"
@@ -39,9 +39,29 @@ export default async function EditProduct({ params, searchParams }: PageProps<"/
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-[32px] font-medium">{p.name}</h1>
-        <Link href={`/products/${p.slug}`} className="font-medium underline underline-offset-4">{t.admin.backToStore} ↗</Link>
+      {/* every action in the title row (user: no scrolling to save, add variants or delete on desktop); the Save button
+          posts the product form below through its id. Sticky from lg: a long variant table scrolls under it, so the
+          actions stay in reach (the -mt/pt pair keeps the page's top padding while the row hides what passes under) */}
+      <div className="flex flex-wrap items-center justify-between gap-4 lg:flex-nowrap lg:sticky lg:top-0 lg:z-20 lg:-mt-10 lg:bg-canvas lg:pt-10 lg:pb-4 lg:shadow-[0_1px_0_var(--color-hairline-soft)]">
+        {/* from lg the name truncates rather than wrapping the row: the images column below pins at this row's height */}
+        <h1 className="text-[32px] font-medium lg:min-w-0 lg:flex-1 lg:truncate" title={p.name}>{p.name}</h1>
+        <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:flex-nowrap">
+          <Link href={`/products/${p.slug}`} className="me-2 font-medium underline underline-offset-4">{t.admin.backToStore} ↗</Link>
+          <form action={deleteProduct.bind(null, p.id)}>
+            <ConfirmButton message={`« ${p.name} » — ${t.admin.confirmDelete}`} aria-label={`${t.admin.delete} « ${p.name} »`}
+              className={cn(buttonVariants({ variant: "destructive", size: "sm" }), "gap-2 max-md:px-2")}>
+              <Trash2 className="size-5" /><span className="max-md:sr-only">{t.admin.delete}</span>
+            </ConfirmButton>
+          </form>
+          <Modal trigger={t.admin.addVariants} title={t.admin.addVariants} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+            <form action={addVariants.bind(null, p.id)} className="flex flex-col gap-4">
+              <MatrixFields t={t} />
+              <Button type="submit" className="w-fit">{t.admin.addVariants}</Button>
+            </form>
+          </Modal>
+          {/* phones save from the sticky bar at the end of the form instead */}
+          <Button type="submit" form="product" size="sm" className="max-lg:hidden">{t.admin.save}</Button>
+        </div>
       </div>
       <Notice t={t} sp={searchParams} />
 
@@ -56,7 +76,7 @@ export default async function EditProduct({ params, searchParams }: PageProps<"/
 
       {/* aside first in the DOM: on phones the images come right after the numbers */}
       <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <aside className="flex flex-col gap-4 lg:sticky lg:top-10 lg:col-start-2 lg:row-start-1">
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-28 lg:col-start-2 lg:row-start-1">
           <h2 className="text-2xl font-medium">{t.admin.images} <span className="text-mute tabular-nums">({p.images.length})</span></h2>
           {p.images.length ? (
             <ul className="grid grid-cols-3 gap-2">
@@ -91,11 +111,11 @@ export default async function EditProduct({ params, searchParams }: PageProps<"/
 
         <div className="flex min-w-0 flex-col gap-8 lg:col-start-1 lg:row-start-1">
           {/* product fields + every variant row, saved together */}
-          <form action={updateProduct.bind(null, p.id)} className="flex flex-col gap-6">
+          <form id="product" action={updateProduct.bind(null, p.id)} className="flex flex-col gap-6">
             <ProductFields t={t} categories={categories} p={p} />
             <section className="flex flex-col gap-4 border-t border-hairline pt-6">
               <h2 className="text-2xl font-medium">{t.admin.variants} <span className="text-mute tabular-nums">({variants.length})</span></h2>
-              <Table stack>
+              <Table stack className="max-md:[&_td]:px-1">
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t.admin.color}</TableHead>
@@ -109,20 +129,21 @@ export default async function EditProduct({ params, searchParams }: PageProps<"/
                 <TableBody>
                   {variants.map((v) => (
                     <TableRow key={v.id}>
-                      <TableCell>
+                      <TableCell className="max-md:min-w-0 max-md:flex-1">
                         <span className="flex items-center gap-2">
-                          <span className="size-3 rounded-full ring-1 ring-hairline" style={{ background: swatch(v.color) }} />
-                          {v.color}
+                          <span className="size-3 shrink-0 rounded-full ring-1 ring-hairline" style={{ background: swatch(v.color) }} />
+                          <span className="min-w-0 truncate">{v.color}</span>
+                          <span className="font-medium md:hidden">{v.size}</span>
                         </span>
                       </TableCell>
-                      <TableCell className="font-medium">{v.size}</TableCell>
-                      <TableCell className="font-mono text-xs text-mute max-md:basis-full max-md:pt-0"><span dir="ltr">{v.sku}</span></TableCell>
-                      <TableCell data-label={t.admin.price}><Input name={`price_${v.id}`} type="number" min={1} defaultValue={v.price} className="h-9 w-28" dir="ltr" /></TableCell>
+                      <TableCell className="font-medium max-md:hidden">{v.size}</TableCell>
+                      <TableCell className="font-mono text-xs text-mute max-md:hidden"><span dir="ltr">{v.sku}</span></TableCell>
+                      <TableCell data-label={t.admin.price}><Input name={`price_${v.id}`} type="number" min={1} defaultValue={v.price} className="h-9 w-28 max-md:w-20" dir="ltr" /></TableCell>
                       <TableCell data-label={t.admin.stock}>
                         <Input name={`stock_${v.id}`} type="number" min={0} defaultValue={v.stockCount} dir="ltr"
-                          className={cn("h-9 w-20", v.stockCount === 0 ? "text-sale" : v.stockCount <= lowStock && "text-[#b45309]")} />
+                          className={cn("h-9 w-20 max-md:w-16", v.stockCount === 0 ? "text-sale" : v.stockCount <= lowStock && "text-[#b45309]")} />
                       </TableCell>
-                      <TableCell className="max-md:ms-auto max-md:self-end">
+                      <TableCell className="max-md:self-end">
                         <ConfirmButton message={t.admin.confirmDelete} formAction={deleteVariant.bind(null, p.id, v.id)}
                           aria-label={t.admin.delete} className="grid size-9 place-items-center rounded-full text-mute hover:bg-cloud hover:text-sale">
                           <Trash2 className="size-5" />
@@ -133,27 +154,10 @@ export default async function EditProduct({ params, searchParams }: PageProps<"/
                 </TableBody>
               </Table>
             </section>
-            {/* sticky: saving never needs a scroll to the end of a long variant list */}
-            <div className="sticky bottom-0 z-10 border-t border-hairline bg-canvas py-4">
+            {/* phones only: the title row has scrolled away by the end of a long variant list */}
+            <div className="sticky bottom-0 z-10 border-t border-hairline bg-canvas py-4 lg:hidden">
               <Button type="submit">{t.admin.save}</Button>
             </div>
-          </form>
-
-          {/* rare action: folded */}
-          <details className="group border-t border-hairline pt-6">
-            <summary className={cn(buttonVariants({ variant: "secondary" }), "w-fit cursor-pointer list-none [&::-webkit-details-marker]:hidden")}>
-              <Plus className="transition-transform group-open:rotate-45" /> {t.admin.addVariants}
-            </summary>
-            <form action={addVariants.bind(null, p.id)} className="mt-6 flex flex-col gap-4">
-              <MatrixFields t={t} />
-              <Button type="submit" className="w-fit">{t.admin.addVariants}</Button>
-            </form>
-          </details>
-
-          <form action={deleteProduct.bind(null, p.id)} className="border-t border-hairline pt-6">
-            <ConfirmButton message={t.admin.confirmDelete} className="font-medium text-sale underline underline-offset-4">
-              {t.admin.delete} « {p.name} »
-            </ConfirmButton>
           </form>
         </div>
       </div>

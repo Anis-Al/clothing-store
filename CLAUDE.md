@@ -1460,7 +1460,7 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   "2. Votre fichier" (the form), one muted rule line under them (`importStep1/2`, `importStep1Text`, `importNote`
   replace the six `importRules`). Import logic untouched.
 
-- Page sizes (user: "fix the numbers"): Produits 7 on desktop / 5 on phones (same header sniff as Stock), Stock 8 / 3.
+- Page sizes (user: "fix the numbers"): Produits 7 on desktop / 5 on phones (same header sniff as Stock), Stock 8 / 3; 2026-11-11 (user): phones 7 and 4.
   Measured so each list fits one screen (1280×800, 375×812) with its filters.
 
 - Footer facts strip (Livraison dans les 58 wilayas · Paiement à la livraison · Retrait en boutique · Point relais)
@@ -1494,6 +1494,31 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   ignores `width: 100%`) and the store section's phone column is `minmax(0,1fr)`.
 - Verified in the pane at 375px: `scrollWidth` 375 (was 412), labels 144px wide on two lines. Not re-checked on the
   iPhone itself; needs a rebuild on the VM (`git pull && docker build … && docker run …`, DEPLOY.md §4).
+
+### 2026-11-11 — Product page: actions in the title row
+- User (desktop): Enregistrer sat under the variant table (read as "save the variants"), Ajouter les variantes under that,
+  Supprimer at the very end: a scroll for each. Now the title row holds Voir la boutique · Supprimer (destructive, confirm)
+  · Ajouter les variantes (`Modal` with the matrix form, replaces the `<details>` fold) · Enregistrer (`form="product"`,
+  the product form's new id). The sticky bottom Save bar stays on phones only (`lg:hidden`), where the title row has
+  scrolled away by the end of the list; the title-row Save is `max-lg:hidden` there. Then (user: "the variants table could be too long"): the title row is
+  sticky from `lg` (`-mt-10 pt-10` under the main's `p-10`, canvas background, hairline shadow), so a 40-row table scrolls under
+  the actions; the sticky images column pins at `top-28` (the row is 104px: 40 + h-10 buttons + 16; a product name long
+  enough to wrap the row would overlap it). Nothing changed in the actions.
+- Phones (user: "the product form layout is bad on the mobile"): the actions are h-10 (`size="sm"`, desktop too), Supprimer
+  is the icon alone below `md` (label `sr-only`), and a variant row is one line: "● colour size" · price (w-20) · stock (w-16)
+  · trash, cells `px-1`, the reference hidden (it is on the Stock page). 375px: rows 120 → 73px, page 3120 → 2384px, no
+  sideways scroll. The actions still wrap under the title on phones (link + trash, then Ajouter les variantes).
+- Produits list on phones (user: the muted line "Accessoires · Variantes 3 · Stock 33 · 1 900 DA" was ambiguous): the
+  price now ends the name line (ink, tabular); a first "Accessoires · Variantes : 3 · Stock : 33" line was still "noise"
+  (user), so the three facts are chips: category (cloud), "3 variantes" (outline, muted), "Stock 33" (outline, ink /
+  amber ≤ lowStock / red 0). Desktop columns unchanged.
+- Review before the commit (5 findings, all fixed): the product delete prompt / aria-label now name the product (same trash
+  icon and generic prompt as the variant rows otherwise); from `lg` the title row is `flex-nowrap` and the name truncates
+  (`title` keeps it), so the row is always 104px under the pinned images column; the colour span got `min-w-0`; the count
+  chip has a singular (`t.admin.variantOne` / `variantMany`, `{n}`; `t.admin` values must stay strings, `Notice` indexes
+  it); the delete button's overrides moved into `cn()` around `buttonVariants` (the rule from the home-page fix).
+- Verified in the pane at 1280×800: all four at y=104, modal opens with the four fields, title-row Save → `?saved=1`
+  toast; 375px: no sideways scroll, sticky bar shown, buttons wrap under the title.
 
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
