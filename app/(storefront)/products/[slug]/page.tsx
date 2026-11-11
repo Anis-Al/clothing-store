@@ -3,6 +3,8 @@ import { notFound } from "next/navigation"
 import { ProductView } from "@/components/store/product-view"
 import { db } from "@/lib/db"
 import { getI18n, getSettings } from "@/lib/i18n"
+import { ogImage } from "@/lib/site"
+import { formatPrice } from "@/lib/dict"
 import { sortSizes, unique } from "@/lib/utils"
 
 const getProduct = (slug: string) =>
@@ -12,8 +14,22 @@ const getProduct = (slug: string) =>
   })
 
 export async function generateMetadata({ params }: PageProps<"/products/[slug]">) {
-  const p = await getProduct(decodeURIComponent((await params).slug))
-  return p ? { title: p.name, description: p.description.slice(0, 160) } : {}
+  const [p, { t, locale }] = await Promise.all([getProduct(decodeURIComponent((await params).slug)), getI18n()])
+  if (!p?.variants.length) return {}
+  // Open Graph: the link card on WhatsApp / Facebook / Instagram shows the first photo, the name and the lowest price
+  const price = Math.min(...p.variants.map((v) => v.price))
+  const description = `${formatPrice(price, locale)} · ${p.description.slice(0, 140)}`
+  const image = p.images[0]?.url
+  return {
+    title: p.name,
+    description,
+    openGraph: {
+      type: "website", title: p.name, description, siteName: t.store.name, url: `/products/${p.slug}`,
+      images: image ? [{ url: ogImage(image), alt: p.name }] : [],
+    },
+    twitter: { card: image ? "summary_large_image" : "summary" },
+    other: { "product:price:amount": String(price), "product:price:currency": "DZD" },
+  }
 }
 
 export default async function ProductPage({ params }: PageProps<"/products/[slug]">) {

@@ -155,6 +155,7 @@ On every start the container does this by itself:
 | `DATABASE_URL` | no | `file:/app/prisma/store.db` (set in the image) |
 | `AUTH_TRUST_HOST` | no | `true` (set in the image; needed behind a reverse proxy) |
 | `PORT` | no | `3000` |
+| `SITE_URL` | no | Public address of the store (`https://boutique.example.dz`), used for the absolute image URLs in the link previews (Open Graph) on WhatsApp / Facebook. Without it the request's own host is used, which is right behind Caddy and on a bare IP. |
 | `SEED_DEMO` | no | Set to `0` **before the first start** of a real store: the seed creates the admin and the category tree but no demo products. Has no effect once the store has categories or products. |
 
 The delivery company (Yalidine, ZR Express, Maystro, NOEST, an Ecotrack courier…) and its API keys are set in the admin

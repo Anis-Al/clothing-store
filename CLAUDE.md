@@ -1520,11 +1520,22 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - Verified in the pane at 1280×800: all four at y=104, modal opens with the four fields, title-row Save → `?saved=1`
   toast; 375px: no sideways scroll, sticky bar shown, buttons wrap under the title.
 
+### 2026-11-11 — Open Graph link previews
+- First item of the feature list (user: "just build the first"). `lib/site.ts`: `siteUrl()` = `SITE_URL` env when set, else
+  the request's host + `x-forwarded-proto` (nothing to configure on a bare-IP demo or behind Caddy), `ogImage()` = the upload
+  through `/_next/image?w=1200` (a 4 MB photo becomes ~180 KB, under WhatsApp's cap; `.svg` demo files go raw, the
+  optimizer answers 400 for them). Root layout: `metadataBase`, `openGraph` (site name, tagline, hero image, `fr_DZ` /
+  `ar_DZ`) and `twitter.card` for every page; the product page overrides with name, "6 200 DA · description", first photo
+  (`og:image` + alt), `product:price:amount` / `currency`. A product without variants returns no metadata (it's a 404).
+  `.env.example` + DEPLOY.md env table mention `SITE_URL` (optional).
+- Checked with curl on dev: home and catalog carry the defaults, Pantalon chino its own tags and image URL; a real jpg
+  through the optimizer = 200, 183 KB. Not yet seen in WhatsApp itself: paste a product link from the live store once
+  redeployed (Facebook's Sharing Debugger shows the same card).
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
-- **SEO, still missing** (simplest first): `metadataBase` from a new `SITE_URL` env var (needed by the rest);
-  `app/sitemap.ts` (home, catalog, categories, products) + `Sitemap:` line in `app/robots.txt`; Open Graph image +
-  price on product pages (WhatsApp/Facebook previews show nothing today); Product JSON-LD (price DZD, stock);
+- **SEO, still missing** (simplest first; `metadataBase` and Open Graph done 2026-11-11, `lib/site.ts`):
+  `app/sitemap.ts` (home, catalog, categories, products) + `Sitemap:` line in `app/robots.txt`; Product JSON-LD (price DZD, stock);
   category pages titled "Tous les produits" with the home description, no canonical, so every size/color/sort/q
   combo is a duplicate URL; default favicon. Arabic is invisible to search engines (locale is a cookie on the
   same URL): only `/ar/...` routes + `hreflang` would fix it.
