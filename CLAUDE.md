@@ -119,6 +119,12 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   Slugs follow the product rule (from the name, never changed). Delete only when no products and no
   sub-categories. Admin selects use `categoryOptions()` ("Hauts › Chemises"); the product form passes
   `leaves = true`: a main category with sub-categories is a group, not offered for a product.
+- **SEO / link previews** (`lib/site.ts`, server-only): `siteUrl()` = `SITE_URL` env or the request's host, used as
+  `metadataBase` (root layout) and by `app/sitemap.ts` / `app/robots.ts`; `ogImage(url)` = an upload through `/_next/image`
+  (raw for `.svg`). The root layout sets the Open Graph defaults; a page that needs its own card sets `openGraph` whole (Next
+  replaces, never merges, nested `openGraph`). Every indexable page sets `alternates.canonical` without its facet / sort /
+  search params (catalog: `/products?category=<slug>`); product pages carry a schema.org `Product` JSON-LD. `/admin`,
+  `/login`, `/merci` stay `noindex` and out of robots / sitemap.
 - **Public pages don't look orders up**: `/merci` shows the summary from `sessionStorage` only;
   never fetch an order by URL param (anyone can open the URL).
 - **Browser storage keys are namespaced** `atelier:*` (`atelier:cart`, `atelier:shipping`,
