@@ -1466,6 +1466,25 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 - Footer facts strip (Livraison dans les 58 wilayas · Paiement à la livraison · Retrait en boutique · Point relais)
   removed (user); the footer starts at the brand + columns. `t.footer.allWilayas` / `cod` dropped.
 
+### 2026-11-11 — First real deployment (GCP demo)
+- User deployed to a GCP `e2-small` (Ubuntu 24.04, Paris) from the browser SSH, following `DEPLOY-GCP.md` + `DEPLOY.md`
+  §3: `docker build` passed on the first try (image 598 MB), the entrypoint applied all 23 migrations and seeded with
+  `SEED_DEMO=0`. Simplified for a no-domain demo: `-p 80:3000` instead of Caddy, plain HTTP on the VM's IP (Auth.js
+  logs in fine over HTTP: `AUTH_TRUST_HOST=true` in the Dockerfile). Pitfalls hit: the `YOU` placeholder left in the
+  clone URL (repo is public: `Anis-Al/clothing-store`), `/srv/atelier.env` not created before `docker run`.
+- Account is on the 90-day free credit: ~0.50 $/day for the VM + disk. Known gaps updated (Docker build verified).
+
+### 2026-11-11 — Home page wider than a phone screen
+- User's iPhone showed the home page zoomed out with a white strip on the right. Cause: the category tile labels. The
+  label span passed its extra classes *inside* `buttonVariants({ className })`, which doesn't merge, so the base's
+  `shrink-0` + `whitespace-nowrap` won over `whitespace-normal`: "Chaussures & accessoires" (208px) overflowed its
+  168px tile and pushed the page to 412px. Now `cn(buttonVariants(...), "min-w-0 shrink whitespace-normal …")`: the
+  label wraps on two lines. Rule: overrides go in `cn()` *around* `buttonVariants`, never in its `className`.
+- Also, iOS-only guard on the home map: the iframe is `w-px min-w-full` (Safari sizes an iframe to its content and
+  ignores `width: 100%`) and the store section's phone column is `minmax(0,1fr)`.
+- Verified in the pane at 375px: `scrollWidth` 375 (was 412), labels 144px wide on two lines. Not re-checked on the
+  iPhone itself; needs a rebuild on the VM (`git pull && docker build … && docker run …`, DEPLOY.md §4).
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
 - **SEO, still missing** (simplest first): `metadataBase` from a new `SITE_URL` env var (needed by the rest);
@@ -1483,7 +1502,8 @@ Keep this section last; update it when something here gets done or newly found.
   of parcels) to stop sending credentials through a third party. Not verified against a real courier account yet
   (only dzship's sandbox): first real send should be watched (commune spellings, `labelUrl`). Our wilaya / commune
   spellings are mapped by the gateway per courier; never rename stored values.
-- `docker build` never run yet (Docker Desktop not initialized on the dev machine). The first build may need fixes.
+- Docker: built and run once on a GCP `e2-small` (2026-11-11, demo on a bare IP, no Caddy). HTTPS via Caddy and the
+  cron line are still untested on a server.
 - Dashboard day buckets and the Commandes date filter follow the server's time zone (Dockerfile sets
   `TZ=Africa/Algiers`, untested). No "delivered on" date exists, so there is no revenue-over-time chart (only order value by
   order date).

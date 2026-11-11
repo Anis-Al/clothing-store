@@ -2,9 +2,9 @@
 
 How to run and test the store on your PC, then put it online, keep it running, back it up and update it.
 
-> **Status:** the production commands below (`migrate deploy` → seed → `next start`) were run and
-> tested locally. The `docker build` itself has **not** been run yet (Docker wasn't set up on the dev
-> machine). Expect to fix small issues on the first real build. Troubleshooting is at the end.
+> **Status:** §3 was run end to end on 2026-11-11 on a GCP `e2-small` (Ubuntu 24.04, 2 GB RAM + swap):
+> `docker build` passed first try, the container applied the 23 migrations, seeded and answered on port 80.
+> Caddy / HTTPS was not used on that run (demo on a bare IP). Troubleshooting is at the end.
 >
 > **Google Cloud:** `DEPLOY-GCP.md` walks through creating the VM, then points back here.
 

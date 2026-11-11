@@ -70,10 +70,10 @@ export default async function Home() {
                 {/* phones: the square tile is filled (cover); from md the whole photo shows (contain) on the soft-cloud tile,
                     since a portrait product photo in a wide tile lost most of itself to the crop */}
                 {img && <Image src={img} alt="" fill sizes={many ? "(max-width: 1023px) 50vw, 25vw" : "50vw"} className="object-cover md:object-contain md:p-4" />}
-                <span className={buttonVariants({
-                  variant: "outline", size: "sm",
-                  className: cn("relative h-auto min-h-10 border-0 py-2 text-start whitespace-normal", !many && "md:h-12 md:px-8 md:text-base"),
-                })}>{c.name}</span>
+                {/* cn() outside buttonVariants, so shrink / whitespace-normal replace the base's shrink-0 / nowrap
+                    (inside, both classes land in the DOM and the base wins: a long name overflowed the tile and the screen) */}
+                <span className={cn(buttonVariants({ variant: "outline", size: "sm" }),
+                  "relative h-auto min-h-10 min-w-0 shrink border-0 py-2 text-start whitespace-normal", !many && "md:h-12 md:px-8 md:text-base")}>{c.name}</span>
               </Link>
             )
           })}
@@ -82,7 +82,7 @@ export default async function Home() {
 
       {/* the shop: address, hours, directions + WhatsApp, and the map when Réglages has its coordinates */}
       {(hasMap || place || hours) && (
-        <section className={cn("grid grid-cols-1 gap-6", hasMap && "md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-center")}>
+        <section className={cn("grid grid-cols-[minmax(0,1fr)] gap-6", hasMap && "md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-center")}>
           <div className="flex flex-col gap-4">
             <h2 className="text-2xl font-medium md:text-[32px]">{t.home.store}</h2>
             {place && <p className="text-lg">{place}</p>}
@@ -101,8 +101,10 @@ export default async function Home() {
             </div>
           </div>
           {hasMap && (
+            // iOS Safari sizes an iframe to its content and ignores width: 100%; w-px + min-w-full is the usual fix,
+            // and the explicit minmax(0, 1fr) column keeps the phone grid track from growing with it
             <iframe src={mapSrc} title={t.home.map} loading="lazy" referrerPolicy="no-referrer"
-              className="aspect-[4/3] w-full border-0 bg-cloud md:aspect-[16/10]" />
+              className="aspect-[4/3] w-px min-w-full border-0 bg-cloud md:aspect-[16/10]" />
           )}
         </section>
       )}
