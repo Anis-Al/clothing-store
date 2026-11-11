@@ -76,7 +76,12 @@ gcloud compute ssh atelier --zone=europe-west9-a
 
 ## 6. Install and start the store
 
-On the VM, follow `DEPLOY.md` from §3.1 to §3.6, in order:
+**Quickest** (demo on the VM's IP, no domain): paste the one command of `DEPLOY.md` §3.0 in the SSH window. It installs
+Docker, clones the code into `/srv/atelier`, builds and starts the store on port 80; a few minutes later
+`http://<VM IP>` answers. For a demo with the 3 demo products, first run `echo SEED_DEMO= | sudo tee /srv/atelier.env`.
+Re-run the same command to update. Then §3.6 (admin password).
+
+Or by hand, `DEPLOY.md` from §3.1 to §3.6, in order:
 
 1. **3.1** Docker, swap (on `e2-micro`), firewall. `ufw` is optional on GCP (its firewall already filters), harmless if kept.
 2. **3.2** Get the code. From GitHub: `git clone https://github.com/<you>/clothing-store.git /srv/atelier`

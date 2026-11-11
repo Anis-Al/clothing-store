@@ -179,6 +179,35 @@ its 200 agencies (`data/yalidine-*.csv`); other couriers type theirs.
 
 ## 3. Deploy with Docker (recommended)
 
+### 3.0 All of it in one command
+
+Paste this on a fresh Ubuntu server (or on one already set up: it skips what exists and rebuilds the new version).
+Installs Docker and git, adds 2 GB of swap on a server with ≤ 2 GB RAM, writes `/srv/atelier.env` with `SEED_DEMO=0`
+if missing, clones or pulls the code into `/srv/atelier`, builds the image, replaces the container and follows its
+log (Ctrl+C leaves the store running). Data lives in the `atelier-db` / `atelier-uploads` volumes and survives re-runs.
+
+```bash
+REPO=https://github.com/Anis-Al/clothing-store.git; \
+sudo apt-get update -qq && sudo apt-get install -y -qq git curl \
+&& { command -v docker >/dev/null || curl -fsSL https://get.docker.com | sudo sh; } \
+&& { [ "$(free -g | awk '/Mem:/{print $2}')" -gt 2 ] || sudo swapon --show | grep -q . || { sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null; }; } \
+&& { [ -f /srv/atelier.env ] || echo 'SEED_DEMO=0' | sudo tee /srv/atelier.env >/dev/null; } \
+&& { [ -d /srv/atelier/.git ] && sudo git -C /srv/atelier pull || sudo git clone "$REPO" /srv/atelier; } \
+&& sudo docker build -t atelier /srv/atelier \
+&& { sudo docker rm -f atelier 2>/dev/null; true; } \
+&& sudo docker run -d --name atelier --restart unless-stopped -p 80:3000 --env-file /srv/atelier.env -v atelier-db:/app/prisma -v atelier-uploads:/app/public/uploads atelier \
+&& sudo docker logs -f atelier
+```
+
+- `REPO`: your own repository URL (a private one asks for a user + personal access token).
+- Demo with the 3 demo products: `echo SEED_DEMO= | sudo tee /srv/atelier.env` **before** the first run.
+- `-p 80:3000` publishes the store on the server's IP over plain HTTP (demo without a domain). With a domain and Caddy
+  (3.5), use `-p 127.0.0.1:3000:3000` instead so only Caddy reaches the app.
+- On a plain VPS add the firewall lines of 3.1 (`ufw`); GCP's own firewall already filters (see `DEPLOY-GCP.md`).
+- Then **3.6**: change the admin password at once.
+
+Steps 3.1–3.4 below are the same thing, one piece at a time.
+
 ### 3.1 Prepare the server (once)
 
 ```bash
@@ -302,6 +331,8 @@ Then use `docker compose up -d --build` to deploy or update, and `docker compose
 ---
 
 ## 4. Updating to a new version
+
+Re-run the command of 3.0 (it pulls, rebuilds and replaces the container), or by hand:
 
 ```bash
 cd /srv/atelier

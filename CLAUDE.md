@@ -1473,6 +1473,16 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   logs in fine over HTTP: `AUTH_TRUST_HOST=true` in the Dockerfile). Pitfalls hit: the `YOU` placeholder left in the
   clone URL (repo is public: `Anis-Al/clothing-store`), `/srv/atelier.env` not created before `docker run`.
 - Account is on the 90-day free credit: ~0.50 $/day for the VM + disk. Known gaps updated (Docker build verified).
+- On the VM afterwards: a second admin created with `docker exec atelier npx tsx scripts/admin.mts …` (§3.6), the local
+  DB backup + `uploads.tgz` copied to the VM's home (the `DEPLOY-GCP.md` "bring your local demo data" recipe), demo data
+  loaded then removed again (seed only). The user then imported real brand products with photos through the CSV import:
+  `prisma/backups/produits-marques.csv` (18 products / 145 variants, written here, validated with `planImport`, gitignored
+  like every backup). The storefront feature review / ROI grouping asked the same day lives in the chat only.
+- Then (user: "a full singular command for deployment, including docker installation"): `DEPLOY.md` §3.0 = one pasteable
+  command (apt git/curl → get.docker.com if no `docker` → 2 GB swap when RAM ≤ 2 GB and no swap → `/srv/atelier.env`
+  with `SEED_DEMO=0` if missing → clone or pull `/srv/atelier` → build → replace the container on `-p 80:3000` → follow
+  the log). Re-runnable = the update path too (§4 points to it); `DEPLOY-GCP.md` §6 leads with it. Checked with
+  `bash -n` and a stubbed simulation of the three branches (fresh server, second run, big server); not run on a server.
 
 ### 2026-11-11 — Home page wider than a phone screen
 - User's iPhone showed the home page zoomed out with a white strip on the right. Cause: the category tile labels. The
