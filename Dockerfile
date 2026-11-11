@@ -7,7 +7,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
-RUN npx prisma generate && npm run build \
+# .next/cache = Turbopack's build cache (hundreds of MB), useless at runtime
+RUN npx prisma generate && npm run build && rm -rf .next/cache \
  # schema, migrations and seed live outside the /app/prisma volume, so a newer image still applies its migrations
  && mkdir -p db && cp -r prisma/schema.prisma prisma/migrations prisma/seed.ts db/
 

@@ -197,6 +197,7 @@ sudo apt-get update -qq && sudo apt-get install -y -qq git curl \
 && sudo docker build -t atelier /srv/atelier \
 && { sudo docker rm -f atelier 2>/dev/null; true; } \
 && sudo docker run -d --name atelier --restart unless-stopped -p 80:3000 --env-file /srv/atelier.env -v atelier-db:/app/prisma -v atelier-uploads:/app/public/uploads atelier \
+&& sudo docker image prune -f && sudo docker builder prune -af \
 && sudo docker logs -f atelier
 ```
 
@@ -341,6 +342,7 @@ git pull                          # or rsync the new files again
 docker build -t atelier .
 docker stop atelier && docker rm atelier
 # same docker run command as 3.4
+docker image prune -f && docker builder prune -af   # the previous image + build cache, ~1 GB per update
 ```
 
 Data is in the volumes, so it survives. New migrations are applied automatically when the container
