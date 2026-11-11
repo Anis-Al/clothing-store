@@ -3,11 +3,18 @@ import { ChevronDown, SlidersHorizontal, X } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import { ProductGrid } from "@/components/store/product-card"
 import { getFacets, getProducts, type Filters } from "@/lib/catalog"
+import { db } from "@/lib/db"
 import { getI18n } from "@/lib/i18n"
 import { cn, sortSizes, swatch } from "@/lib/utils"
 
-export async function generateMetadata() {
-  return { title: (await getI18n()).t.catalog.title }
+export async function generateMetadata({ searchParams }: PageProps<"/products">) {
+  const { category } = await searchParams
+  const [{ t }, c] = await Promise.all([
+    getI18n(),
+    typeof category === "string" && category ? db.category.findUnique({ where: { slug: category }, select: { name: true, slug: true } }) : null,
+  ])
+  // one canonical per category: size / colour / sort / q combinations are views of the same page, not pages
+  return { title: c?.name ?? t.catalog.title, alternates: { canonical: c ? `/products?category=${c.slug}` : "/products" } }
 }
 
 export default async function Catalog({ searchParams }: PageProps<"/products">) {

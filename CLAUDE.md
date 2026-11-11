@@ -854,7 +854,7 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
 ### 2026-10-14 — SEO: robots.txt
 - SEO audit (fetched as Googlebot): server-rendered pages, real links, stable slugs, per-product title +
   description, `lang`/`dir`, image `alt`, admin/login/merci noindex: fine. Missing items went to Known gaps.
-- `app/robots.txt` (static, no code): `Disallow: /cart` only. `/admin`, `/login`, `/merci` deliberately not
+- `app/robots.txt` (static, no code; → `app/robots.ts` on 2026-11-11): `Disallow: /cart` only. `/admin`, `/login`, `/merci` deliberately not
   listed (robots.txt is public; they are unlinked and already noindex). No `Sitemap:` line until a site URL exists.
 - Verified: `/robots.txt` 200 `text/plain` on dev.
 
@@ -1532,13 +1532,24 @@ dev server can hold :3000, so check for the user's own `npm run dev` window firs
   through the optimizer = 200, 183 KB. Not yet seen in WhatsApp itself: paste a product link from the live store once
   redeployed (Facebook's Sharing Debugger shows the same card).
 
+### 2026-11-11 — SEO: sitemap, canonical, JSON-LD
+- `app/sitemap.ts` (home, catalog, every `SHOWN_CATEGORY` as `?category=<slug>`, every product with a variant; `siteUrl()`
+  for absolute URLs, read at request time) and `app/robots.ts` replacing the static `robots.txt` (same `Disallow: /cart`,
+  plus the `Sitemap:` line, which has to be absolute). Catalog `generateMetadata` reads `?category=`: the title is the
+  category's name, the canonical `/products?category=<slug>` (size / colour / sort / q combos collapse onto it; unknown slug
+  → `/products`). Product page: canonical `/products/<slug>` and a schema.org `Product` JSON-LD (`AggregateOffer` low /
+  high price in DZD, `InStock` while any variant has stock, every image absolute, brand = store name); `<` escaped in the
+  JSON so a description can't close the script.
+- Checked with curl on dev: robots 200 with the sitemap line, sitemap 43 URLs (2 + 23 categories + 18 products),
+  `?category=hauts&size=M&sort=price-asc` → title "Hauts", canonical with the category only; JSON-LD parses. Not run through
+  Google's Rich Results test (needs the public URL).
+
 ### Known gaps / next steps
 Keep this section last; update it when something here gets done or newly found.
-- **SEO, still missing** (simplest first; `metadataBase` and Open Graph done 2026-11-11, `lib/site.ts`):
-  `app/sitemap.ts` (home, catalog, categories, products) + `Sitemap:` line in `app/robots.txt`; Product JSON-LD (price DZD, stock);
-  category pages titled "Tous les produits" with the home description, no canonical, so every size/color/sort/q
-  combo is a duplicate URL; default favicon. Arabic is invisible to search engines (locale is a cookie on the
-  same URL): only `/ar/...` routes + `hreflang` would fix it.
+- **SEO**: `metadataBase`, Open Graph, sitemap, robots, canonicals and Product JSON-LD done 2026-11-11 (`lib/site.ts`,
+  `app/sitemap.ts`, `app/robots.ts`). Still missing: a favicon (Next's default), category pages share the home description,
+  product `lastModified` is the creation date (no `updatedAt` column). Arabic is invisible to search engines (locale is a
+  cookie on the same URL): only `/ar/...` routes + `hreflang` would fix it.
 - **Courier integration** (done 2026-11-10 through dzship, see Conventions): one-way parcel creation + tracking.
   Tracking: per order, "Tout actualiser", and a cron script (not running until the server's crontab gets the line);
   no event history shown (only the last status); Sandbox always says `in_transit`. Not done: per-wilaya delivery fee

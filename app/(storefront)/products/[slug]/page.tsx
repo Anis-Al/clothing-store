@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { ProductView } from "@/components/store/product-view"
 import { db } from "@/lib/db"
 import { getI18n, getSettings } from "@/lib/i18n"
-import { ogImage } from "@/lib/site"
+import { ogImage, siteUrl } from "@/lib/site"
 import { formatPrice } from "@/lib/dict"
 import { sortSizes, unique } from "@/lib/utils"
 
@@ -23,6 +23,7 @@ export async function generateMetadata({ params }: PageProps<"/products/[slug]">
   return {
     title: p.name,
     description,
+    alternates: { canonical: `/products/${p.slug}` },
     openGraph: {
       type: "website", title: p.name, description, siteName: t.store.name, url: `/products/${p.slug}`,
       images: image ? [{ url: ogImage(image), alt: p.name }] : [],
@@ -33,8 +34,21 @@ export async function generateMetadata({ params }: PageProps<"/products/[slug]">
 }
 
 export default async function ProductPage({ params }: PageProps<"/products/[slug]">) {
-  const [p, { t }, s] = await Promise.all([getProduct(decodeURIComponent((await params).slug)), getI18n(), getSettings()])
+  const [p, { t }, s, base] = await Promise.all([getProduct(decodeURIComponent((await params).slug)), getI18n(), getSettings(), siteUrl()])
   if (!p?.variants.length) notFound() // a product with no variant left has nothing to sell
+
+  // schema.org Product for Google's rich results: lowest / highest price in DZD, in stock while any variant has stock
+  const prices = p.variants.map((v) => v.price)
+  const jsonLd = {
+    "@context": "https://schema.org", "@type": "Product",
+    name: p.name, description: p.description, category: p.category.name, url: new URL(`/products/${p.slug}`, base).href,
+    image: p.images.map((i) => new URL(i.url, base).href),
+    brand: { "@type": "Brand", name: t.store.name },
+    offers: {
+      "@type": "AggregateOffer", priceCurrency: "DZD", lowPrice: Math.min(...prices), highPrice: Math.max(...prices), offerCount: p.variants.length,
+      availability: p.variants.some((v) => v.stockCount > 0) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    },
+  }
 
   const row = (label: string, body: string, open = false) => (
     <details className="group border-b border-hairline py-6" open={open}>
@@ -48,6 +62,9 @@ export default async function ProductPage({ params }: PageProps<"/products/[slug
 
   return (
     <div className="py-6">
+      {/* JSON.stringify output can't close the script: "<" never appears unescaped in JSON, but "</script" could inside a
+          description, hence the replace */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\u003c") }} />
       <ProductView
         product={{ slug: p.slug, name: p.name, category: p.category.name }}
         colors={unique(p.variants.map((v) => v.color))}

@@ -1,3 +1,0 @@
-# /admin, /login and /merci are unlinked and noindex: listing them here would only advertise them.
-User-Agent: *
-Disallow: /cart
